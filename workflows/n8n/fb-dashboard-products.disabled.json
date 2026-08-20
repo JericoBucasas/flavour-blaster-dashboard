@@ -1,11 +1,11 @@
 {
-  "name": "FB Dashboard | Product Catalog to Supabase [DISABLED]",
+  "name": "FB Dashboard | Complete Product Catalog to Supabase [DISABLED]",
   "nodes": [
     {
       "parameters": {
-        "content": "## CONTROLLED RELEASE SAFETY\nInactive template with a closed code gate. The initial catalog run is capped at 50 pages of 100 products. Later runs use the last successful timestamp with a five-minute overlap. Requests retry three times, pagination pauses for one second, and the checkpoint advances only after all writes succeed.",
-        "height": 280,
-        "width": 540,
+        "content": "## COMPLETE PRODUCT CATALOG SYNC\nRuns every six hours in Europe/London time. Shopify is authoritative. Each successful run performs a full catalog scan, upserts product, variant, cost and location inventory details, preserves product-title history, and soft-deletes records no longer present in Shopify. The final checkpoint advances only after every page and deletion finalization succeeds.",
+        "height": 320,
+        "width": 620,
         "color": 5
       },
       "id": "products-note",
@@ -22,15 +22,14 @@
         "rule": {
           "interval": [
             {
-              "field": "days",
-              "daysInterval": 1,
-              "triggerAtHour": 3
+              "field": "cronExpression",
+              "expression": "0 0 */6 * * *"
             }
           ]
         }
       },
       "id": "products-schedule",
-      "name": "Schedule - Daily (Inactive)",
+      "name": "Schedule - Every 6 Hours (London)",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
@@ -53,51 +52,10 @@
     },
     {
       "parameters": {
-        "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_sync_state?source_key=eq.shopify_products&select=source_key,cursor_updated_at,last_success_at,metadata",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpCustomAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Accept",
-              "value": "application/json"
-            },
-            {
-              "name": "User-Agent",
-              "value": "FlavourBlasterDashboard-n8n/1.0"
-            }
-          ]
-        },
-        "options": {
-          "timeout": 30000
-        }
-      },
-      "id": "products-read-checkpoint",
-      "name": "Read Products Checkpoint [CREDENTIAL REQUIRED]",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "alwaysOutputData": true,
-      "position": [
-        -640,
-        100
-      ],
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 2000,
-      "credentials": {
-        "httpCustomAuth": {
-          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
-          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "const rows = $input.all().map(i => i.json);\nconst checkpoint = rows.find(r => r && r.source_key === 'shopify_products') || null;\nconst end = new Date();\nconst saved = checkpoint?.cursor_updated_at ? new Date(checkpoint.cursor_updated_at) : null;\nconst start = saved && !Number.isNaN(saved.getTime()) ? new Date(saved.getTime() - 5 * 60000).toISOString() : null;\nreturn [{ json: { start, end: end.toISOString(), query: start ? `updated_at:>=${start}` : '', after: null, page: 1, maxPages: 50, pagesRead: 0, productsRead: 0, variantsRead: 0 } }];"
+        "jsCode": "const runStartedAt = new Date().toISOString();\nreturn [{ json: { runStartedAt, end: runStartedAt, after: null, page: 1, maxPages: 100, pagesRead: 0, productsRead: 0, variantsRead: 0, inventoryLevelsRead: 0 } }];"
       },
       "id": "products-state",
-      "name": "Build Catalog Sync State",
+      "name": "Initialize Full Catalog Sync",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -114,13 +72,13 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ query: `query DashboardProducts($query: String, $after: String) { products(first: 100, after: $after, sortKey: UPDATED_AT, query: $query) { pageInfo { hasNextPage endCursor } nodes { id legacyResourceId title handle status vendor productType tags updatedAt featuredMedia { preview { image { url } } } variants(first: 100) { nodes { id legacyResourceId title sku barcode price compareAtPrice inventoryQuantity updatedAt image { url } } } } } }`, variables: { query: $json.query || null, after: $json.after } }) }}",
+        "body": "={{ JSON.stringify({ query: \"query DashboardProducts($after: String) {\\n  locations(first: 100) { nodes { id legacyResourceId name isActive } }\\n  products(first: 2, after: $after, sortKey: ID) {\\n    pageInfo { hasNextPage endCursor }\\n    nodes {\\n      id legacyResourceId title descriptionHtml handle status vendor productType tags templateSuffix\\n      createdAt updatedAt publishedAt\\n      seo { title description }\\n      options { id name position values }\\n      featuredMedia { preview { image { url width height } } }\\n      media(first: 100) { nodes { id mediaContentType alt status preview { image { url width height } } } }\\n      collections(first: 100) { nodes { id legacyResourceId title handle updatedAt } }\\n      metafields(first: 100) { nodes { id legacyResourceId namespace key type value jsonValue createdAt updatedAt } }\\n      variants(first: 100) {\\n        nodes {\\n          id legacyResourceId title displayName sku barcode position price compareAtPrice\\n          inventoryQuantity inventoryPolicy taxable createdAt updatedAt\\n          selectedOptions { name value }\\n          image { url width height }\\n          inventoryItem {\\n            id legacyResourceId tracked requiresShipping\\n            unitCost { amount currencyCode }\\n            measurement { weight { value unit } }\\n          }\\n        }\\n      }\\n    }\\n  }\\n}\", variables: { after: $json.after } }) }}",
         "options": {
           "timeout": 120000
         }
       },
       "id": "products-shopify",
-      "name": "Shopify GraphQL - Products Page",
+      "name": "Shopify GraphQL - Complete Products Page",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -154,10 +112,10 @@
     },
     {
       "parameters": {
-        "jsCode": "const response = $json.data?.products;\nif (!response || !response.pageInfo || !Array.isArray(response.nodes)) throw new Error('SHOPIFY_PRODUCTS_RESPONSE_INVALID');\nconst numericId = gid => Number(String(gid || '').split('/').pop()) || null;\nconst products = []; const variants = [];\nfor (const p of response.nodes) {\n  const productId = Number(p.legacyResourceId) || numericId(p.id);\n  if (!Number.isSafeInteger(productId)) throw new Error('SHOPIFY_PRODUCT_ID_INVALID');\n  products.push({ shopify_product_id: productId, title: p.title, handle: p.handle, status: String(p.status || '').toLowerCase(), vendor: p.vendor, product_type: p.productType, tags: p.tags || [], image_url: p.featuredMedia?.preview?.image?.url || null, shopify_updated_at: p.updatedAt, raw: p });\n  for (const v of p.variants?.nodes || []) { const variantId = Number(v.legacyResourceId) || numericId(v.id); if (!Number.isSafeInteger(variantId)) throw new Error('SHOPIFY_VARIANT_ID_INVALID'); variants.push({ shopify_variant_id: variantId, shopify_product_id: productId, title: v.title, sku: v.sku, barcode: v.barcode, price: Number(v.price || 0), compare_at_price: v.compareAtPrice == null ? null : Number(v.compareAtPrice), inventory_quantity: v.inventoryQuantity, image_url: v.image?.url || p.featuredMedia?.preview?.image?.url || null, shopify_updated_at: v.updatedAt, raw: v }); }\n}\nreturn [{ json: { start: $json.start, end: $json.end, query: $json.query || '', after: $json.after, page: Number($json.page), maxPages: Number($json.maxPages), pagesRead: Number($json.pagesRead || 0), productsRead: Number($json.productsRead || 0), variantsRead: Number($json.variantsRead || 0), products, variants, pageInfo: response.pageInfo } }];"
+        "jsCode": "const response = $json.data?.products;\nif (!response || !response.pageInfo || !Array.isArray(response.nodes)) throw new Error('SHOPIFY_PRODUCTS_RESPONSE_INVALID');\nconst numericId = gid => Number(String(gid || '').split('/').pop()) || null;\nconst runStartedAt = $json.runStartedAt;\nconst now = new Date().toISOString();\nconst locations = Object.fromEntries(($json.data?.locations?.nodes || []).map(l => [String(l.legacyResourceId || numericId(l.id)), l.name || null]));\nconst products = [];\nconst variants = [];\nconst inventoryItemIds = [];\nconst variantByInventoryItem = {};\nfor (const p of response.nodes) {\n  const productId = Number(p.legacyResourceId) || numericId(p.id);\n  if (!Number.isSafeInteger(productId)) throw new Error('SHOPIFY_PRODUCT_ID_INVALID');\n  products.push({\n    shopify_product_id: productId, title: p.title, description_html: p.descriptionHtml || null,\n    handle: p.handle, status: String(p.status || '').toLowerCase(), vendor: p.vendor,\n    product_type: p.productType, tags: p.tags || [], template_suffix: p.templateSuffix || null,\n    image_url: p.featuredMedia?.preview?.image?.url || null,\n    published_at: p.publishedAt || null, shopify_created_at: p.createdAt || null,\n    shopify_updated_at: p.updatedAt, seo_title: p.seo?.title || null,\n    seo_description: p.seo?.description || null, options: p.options || [],\n    media: (p.media?.nodes || []).map(m => ({ id: m.id, type: m.mediaContentType, alt: m.alt, status: m.status, preview: m.preview?.image || null })),\n    collections: (p.collections?.nodes || []).map(c => ({ id: c.legacyResourceId || numericId(c.id), title: c.title, handle: c.handle, updatedAt: c.updatedAt })),\n    metafields: (p.metafields?.nodes || []).map(m => ({ id: m.legacyResourceId || numericId(m.id), namespace: m.namespace, key: m.key, type: m.type, value: m.value, jsonValue: m.jsonValue, createdAt: m.createdAt, updatedAt: m.updatedAt })),\n    last_seen_at: runStartedAt, is_deleted: false, deleted_at: null, synced_at: now, updated_at: now,\n  });\n  for (const v of p.variants?.nodes || []) {\n    const variantId = Number(v.legacyResourceId) || numericId(v.id);\n    const inventoryItemId = Number(v.inventoryItem?.legacyResourceId) || numericId(v.inventoryItem?.id);\n    if (!Number.isSafeInteger(variantId)) throw new Error('SHOPIFY_VARIANT_ID_INVALID');\n    if (inventoryItemId) { inventoryItemIds.push(inventoryItemId); variantByInventoryItem[String(inventoryItemId)] = variantId; }\n    variants.push({\n      shopify_variant_id: variantId, shopify_product_id: productId, title: v.title,\n      sku: v.sku, barcode: v.barcode, position: v.position, price: Number(v.price || 0),\n      compare_at_price: v.compareAtPrice == null ? null : Number(v.compareAtPrice),\n      unit_cost: v.inventoryItem?.unitCost?.amount == null ? null : Number(v.inventoryItem.unitCost.amount),\n      unit_cost_currency: v.inventoryItem?.unitCost?.currencyCode || null,\n      inventory_quantity: v.inventoryQuantity, inventory_policy: String(v.inventoryPolicy || '').toLowerCase() || null,\n      taxable: v.taxable, image_url: v.image?.url || p.featuredMedia?.preview?.image?.url || null,\n      inventory_item_id: inventoryItemId, selected_options: v.selectedOptions || [],\n      weight: v.inventoryItem?.measurement?.weight?.value == null ? null : Number(v.inventoryItem.measurement.weight.value),\n      weight_unit: v.inventoryItem?.measurement?.weight?.unit || null,\n      requires_shipping: v.inventoryItem?.requiresShipping ?? null, tracked: v.inventoryItem?.tracked ?? null,\n      shopify_created_at: v.createdAt || null, shopify_updated_at: v.updatedAt,\n      last_seen_at: runStartedAt, is_deleted: false, deleted_at: null, synced_at: now, updated_at: now,\n    });\n  }\n}\nreturn [{ json: {\n  runStartedAt, end: $json.end, after: $json.after, page: Number($json.page), maxPages: Number($json.maxPages),\n  pagesRead: Number($json.pagesRead || 0), productsRead: Number($json.productsRead || 0),\n  variantsRead: Number($json.variantsRead || 0), inventoryLevelsRead: Number($json.inventoryLevelsRead || 0),\n  products, variants, inventoryItemIds: [...new Set(inventoryItemIds)], variantByInventoryItem, locations,\n  pageInfo: response.pageInfo,\n} }];"
       },
       "id": "products-normalize",
-      "name": "Normalize Products and Variants",
+      "name": "Normalize Complete Products and Variants",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -187,7 +145,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify($('Normalize Products and Variants').item.json.products.map(({ raw, ...product }) => product)) }}",
+        "body": "={{ JSON.stringify($('Normalize Complete Products and Variants').item.json.products) }}",
         "options": {
           "timeout": 120000
         }
@@ -233,7 +191,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify($('Normalize Products and Variants').item.json.variants.map(({ raw, ...variant }) => variant)) }}",
+        "body": "={{ JSON.stringify($('Normalize Complete Products and Variants').item.json.variants) }}",
         "options": {
           "timeout": 120000
         }
@@ -259,7 +217,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const b = $('Normalize Products and Variants').item.json;\nconst pagesRead = b.pagesRead + 1;\nconst hasNextPage = Boolean(b.pageInfo?.hasNextPage);\nif (hasNextPage && pagesRead >= b.maxPages) throw new Error(`SHOPIFY_PRODUCTS_PAGE_LIMIT_REACHED:${b.maxPages}`);\nif (hasNextPage && !b.pageInfo?.endCursor) throw new Error('SHOPIFY_PRODUCTS_CURSOR_MISSING');\nreturn [{ json: { start: b.start, end: b.end, query: b.query, after: hasNextPage ? b.pageInfo.endCursor : null, page: b.page + 1, maxPages: b.maxPages, pagesRead, productsRead: b.productsRead + b.products.length, variantsRead: b.variantsRead + b.variants.length, continue: hasNextPage } }];"
+        "jsCode": "const b = $('Normalize Inventory Levels').item.json;\nconst pagesRead = b.pagesRead + 1;\nconst hasNextPage = Boolean(b.pageInfo?.hasNextPage);\nif (hasNextPage && pagesRead >= b.maxPages) throw new Error('SHOPIFY_PRODUCTS_PAGE_LIMIT_REACHED:' + b.maxPages);\nif (hasNextPage && !b.pageInfo?.endCursor) throw new Error('SHOPIFY_PRODUCTS_CURSOR_MISSING');\nreturn [{ json: {\n  runStartedAt: b.runStartedAt, end: b.end, after: hasNextPage ? b.pageInfo.endCursor : null,\n  page: b.page + 1, maxPages: b.maxPages, pagesRead,\n  productsRead: b.productsRead + b.products.length, variantsRead: b.variantsRead + b.variants.length,\n  inventoryLevelsRead: b.inventoryLevelsRead + b.inventoryLevels.length, continue: hasNextPage,\n} }];"
       },
       "id": "products-advance",
       "name": "Advance Cursor After Successful Writes",
@@ -306,7 +264,8 @@
     },
     {
       "parameters": {
-        "amount": 1
+        "amount": 1,
+        "unit": "seconds"
       },
       "id": "products-wait",
       "name": "Rate Limit Pause - 1 Second",
@@ -340,7 +299,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ source_key: 'shopify_products', cursor_updated_at: $json.end, last_success_at: new Date().toISOString(), metadata: { window_start: $json.start, window_end: $json.end, pages_read: $json.pagesRead, products_read: $json.productsRead, variants_read: $json.variantsRead, max_pages: $json.maxPages } }) }}",
+        "body": "={{ JSON.stringify({ source_key: 'shopify_products', cursor_updated_at: $('Advance Cursor After Successful Writes').item.json.end, last_success_at: new Date().toISOString(), metadata: { schedule_timezone: 'Europe/London', schedule_hours: 6, full_catalog: true, pages_read: $('Advance Cursor After Successful Writes').item.json.pagesRead, products_read: $('Advance Cursor After Successful Writes').item.json.productsRead, variants_read: $('Advance Cursor After Successful Writes').item.json.variantsRead, inventory_levels_read: $('Advance Cursor After Successful Writes').item.json.inventoryLevelsRead, max_pages: $('Advance Cursor After Successful Writes').item.json.maxPages } }) }}",
         "options": {
           "timeout": 30000
         }
@@ -363,10 +322,142 @@
           "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
         }
       }
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://jetchill-mixology.myshopify.com/admin/api/2026-07/inventory_levels.json?limit=250&inventory_item_ids=' + $('Normalize Complete Products and Variants').item.json.inventoryItemIds.join(',') }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "products-inventory-levels",
+      "name": "Shopify REST - Inventory Levels for Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1010,
+        100
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "TOFvh8rHI1pD468B",
+          "name": "Flavour Blaster OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $('Normalize Complete Products and Variants').item.json;\nconst now = new Date().toISOString();\nconst inventoryLevels = ($json.inventory_levels || []).map(level => {\n  const inventoryItemId = Number(level.inventory_item_id);\n  const variantId = b.variantByInventoryItem[String(inventoryItemId)];\n  if (!variantId) throw new Error('INVENTORY_LEVEL_VARIANT_NOT_FOUND:' + inventoryItemId);\n  return {\n    shopify_variant_id: variantId, shopify_inventory_item_id: inventoryItemId,\n    shopify_location_id: Number(level.location_id), location_name: b.locations[String(level.location_id)] || null,\n    available: level.available == null ? null : Number(level.available), shopify_updated_at: level.updated_at || null,\n    last_seen_at: b.runStartedAt, is_deleted: false, deleted_at: null, synced_at: now, updated_at: now,\n  };\n});\nreturn [{ json: { ...b, inventoryLevels } }];"
+      },
+      "id": "products-normalize-inventory",
+      "name": "Normalize Inventory Levels",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1230,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_product_inventory_levels?on_conflict=shopify_variant_id,shopify_location_id",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=minimal"
+            },
+            {
+              "name": "User-Agent",
+              "value": "FlavourBlasterDashboard-n8n/1.0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.inventoryLevels) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "products-upsert-inventory",
+      "name": "Supabase Upsert Inventory Levels [CREDENTIAL REQUIRED]",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1450,
+        100
+      ],
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/rpc/fb_finalize_product_catalog_sync",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "User-Agent",
+              "value": "FlavourBlasterDashboard-n8n/1.0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ p_sync_started_at: $('Advance Cursor After Successful Writes').item.json.runStartedAt }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "products-finalize",
+      "name": "Finalize Soft Deletions [CREDENTIAL REQUIRED]",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1700,
+        220
+      ],
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
+        }
+      }
     }
   ],
   "connections": {
-    "Schedule - Daily (Inactive)": {
+    "Schedule - Every 6 Hours (London)": {
       "main": [
         [
           {
@@ -381,29 +472,18 @@
       "main": [
         [
           {
-            "node": "Read Products Checkpoint [CREDENTIAL REQUIRED]",
+            "node": "Initialize Full Catalog Sync",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Read Products Checkpoint [CREDENTIAL REQUIRED]": {
+    "Initialize Full Catalog Sync": {
       "main": [
         [
           {
-            "node": "Build Catalog Sync State",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Build Catalog Sync State": {
-      "main": [
-        [
-          {
-            "node": "Shopify GraphQL - Products Page",
+            "node": "Shopify GraphQL - Complete Products Page",
             "type": "main",
             "index": 0
           },
@@ -415,7 +495,7 @@
         ]
       ]
     },
-    "Shopify GraphQL - Products Page": {
+    "Shopify GraphQL - Complete Products Page": {
       "main": [
         [
           {
@@ -430,14 +510,14 @@
       "main": [
         [
           {
-            "node": "Normalize Products and Variants",
+            "node": "Normalize Complete Products and Variants",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Normalize Products and Variants": {
+    "Normalize Complete Products and Variants": {
       "main": [
         [
           {
@@ -460,6 +540,39 @@
       ]
     },
     "Supabase Upsert Variants [CREDENTIAL REQUIRED]": {
+      "main": [
+        [
+          {
+            "node": "Shopify REST - Inventory Levels for Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shopify REST - Inventory Levels for Page": {
+      "main": [
+        [
+          {
+            "node": "Normalize Inventory Levels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Inventory Levels": {
+      "main": [
+        [
+          {
+            "node": "Supabase Upsert Inventory Levels [CREDENTIAL REQUIRED]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Upsert Inventory Levels [CREDENTIAL REQUIRED]": {
       "main": [
         [
           {
@@ -492,7 +605,7 @@
         ],
         [
           {
-            "node": "Supabase Upsert Success Checkpoint [CREDENTIAL REQUIRED]",
+            "node": "Finalize Soft Deletions [CREDENTIAL REQUIRED]",
             "type": "main",
             "index": 0
           }
@@ -503,12 +616,23 @@
       "main": [
         [
           {
-            "node": "Shopify GraphQL - Products Page",
+            "node": "Shopify GraphQL - Complete Products Page",
             "type": "main",
             "index": 0
           },
           {
             "node": "Merge State and Shopify Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finalize Soft Deletions [CREDENTIAL REQUIRED]": {
+      "main": [
+        [
+          {
+            "node": "Supabase Upsert Success Checkpoint [CREDENTIAL REQUIRED]",
             "type": "main",
             "index": 0
           }
@@ -521,11 +645,11 @@
     "executionOrder": "v1",
     "saveManualExecutions": true,
     "callerPolicy": "workflowsFromSameOwner",
-    "executionTimeout": 900
+    "executionTimeout": 900,
+    "timezone": "Europe/London"
   },
-  "versionId": "fb-dashboard-products-development-v2",
   "meta": {
-    "templateCredsSetupCompleted": false
+    "templateCredsSetupCompleted": true
   },
   "tags": []
 }
