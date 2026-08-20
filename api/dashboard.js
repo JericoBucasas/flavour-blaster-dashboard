@@ -1,6 +1,6 @@
 'use strict';
 
-const { parseDate, buildSnapshotRequest, buildCatalogRequest, sanitizeSnapshot } = require('../lib/dashboard-request');
+const { parseDate, buildSnapshotRequest, buildCatalogRequest, buildDirectoryRequest, sanitizeSnapshot } = require('../lib/dashboard-request');
 
 module.exports = async function dashboard(req, res) {
   if (req.method !== 'GET') {
@@ -22,23 +22,27 @@ module.exports = async function dashboard(req, res) {
   const secretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
   let request;
   let catalogRequest;
+  let directoryRequest;
   try {
     request = buildSnapshotRequest(process.env.SUPABASE_URL, secretKey, start, end);
     catalogRequest = buildCatalogRequest(process.env.SUPABASE_URL, secretKey);
+    directoryRequest = buildDirectoryRequest(process.env.SUPABASE_URL, secretKey);
   } catch (_error) {
     return res.status(503).json({ status: 'unavailable', code: 'DATASTORE_NOT_CONFIGURED' });
   }
 
   try {
-    const [upstream, catalogUpstream] = await Promise.all([
+    const [upstream, catalogUpstream, directoryUpstream] = await Promise.all([
       fetch(request.url, request.options),
       fetch(catalogRequest.url, catalogRequest.options),
+      fetch(directoryRequest.url, directoryRequest.options),
     ]);
-    const [body, catalogBody] = await Promise.all([
+    const [body, catalogBody, directoryBody] = await Promise.all([
       upstream.json().catch(() => null),
       catalogUpstream.json().catch(() => null),
+      directoryUpstream.json().catch(() => null),
     ]);
-    if (!upstream.ok || !catalogUpstream.ok) {
+    if (!upstream.ok || !catalogUpstream.ok || !directoryUpstream.ok) {
       return res.status(502).json({ status: 'error', code: 'DATASTORE_QUERY_FAILED' });
     }
     const data = sanitizeSnapshot(body);
@@ -46,8 +50,13 @@ module.exports = async function dashboard(req, res) {
     if (!productCatalog || typeof productCatalog !== 'object' || !Array.isArray(productCatalog.products)) {
       return res.status(502).json({ status: 'error', code: 'PRODUCT_CATALOG_INVALID' });
     }
+    const customerDirectory = Array.isArray(directoryBody) ? directoryBody[0] : directoryBody;
+    if (!customerDirectory || typeof customerDirectory !== 'object' || !Array.isArray(customerDirectory.customers)
+      || !Array.isArray(customerDirectory.companies) || !Array.isArray(customerDirectory.locations)) {
+      return res.status(502).json({ status: 'error', code: 'CUSTOMER_DIRECTORY_INVALID' });
+    }
     res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
-    return res.status(200).json({ status: 'live', data:{ ...data, productCatalog } });
+    return res.status(200).json({ status: 'live', data:{ ...data, productCatalog, customerDirectory } });
   } catch (_error) {
     return res.status(502).json({ status: 'error', code: 'DATASTORE_UNREACHABLE' });
   }

@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <script src="./support.js"></script>
 <script src="./dashboard-live.js"></script>
 </head>
@@ -67,6 +67,16 @@
     .prod-location-panel { margin:2px 0 6px;padding:14px 16px;background:var(--sd-canvas);border:1px solid var(--sd-line);border-radius:10px; }
     .prod-location-grid { display:grid;grid-template-columns:minmax(0,1fr);margin-top:10px; }
     .prod-location-item { display:flex;align-items:center;justify-content:space-between;gap:16px;min-width:0;padding:8px 0;border-top:1px solid var(--sd-line); }
+    .dir-tabs { display:flex;align-items:center;gap:4px;padding:4px;background:var(--sd-canvas);border-radius:10px;overflow-x:auto;scrollbar-width:none; }
+    .dir-tabs::-webkit-scrollbar { display:none; }
+    .dir-tab { appearance:none;border:0;border-radius:7px;padding:8px 12px;background:transparent;color:inherit;font:inherit;font-size:13px;white-space:nowrap;cursor:pointer; }
+    .dir-tab:focus-visible,.dir-name-btn:focus-visible,.dir-card:focus-visible { outline:2px solid var(--color-accent-500);outline-offset:2px; }
+    .dir-name-btn { appearance:none;border:0;background:transparent;color:inherit;font:inherit;font-weight:650;text-align:left;padding:0;cursor:pointer; }
+    .dir-name-btn:hover { color:var(--color-accent-700); }
+    .dir-detail { margin:2px 0 6px;padding:14px 16px;background:var(--sd-canvas);border:1px solid var(--sd-line);border-radius:10px; }
+    .dir-detail-lines { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 24px;margin-top:8px; }
+    .dir-detail-line { padding:7px 0;border-top:1px solid var(--sd-line);font-size:12.5px;line-height:1.45;overflow-wrap:anywhere; }
+    .dir-mobile-list { display:none; }
     #lg-bbar, #lg-fab { display: none; }
     @media (max-width: 920px) {
       .m-hide { display: none !important; }
@@ -108,6 +118,14 @@
       #lg-ctrl > div:first-child > div { max-width: 100% !important; }
       #lg-ctrl > div:last-child { flex-wrap: nowrap !important; overflow-x: auto; width: 100%; padding-bottom: 2px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
       #lg-ctrl > div:last-child::-webkit-scrollbar { display: none; }
+      .dir-desktop-table { display:none !important; }
+      .dir-mobile-list { display:grid;gap:8px; }
+      .dir-card { appearance:none;width:100%;border:1px solid var(--sd-line);border-radius:10px;background:var(--sd-card);color:inherit;font:inherit;text-align:left;padding:13px 14px;cursor:pointer; }
+      .dir-card-top { display:flex;align-items:flex-start;justify-content:space-between;gap:12px; }
+      .dir-card-metrics { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 16px;margin-top:10px; }
+      .dir-card-metric span { display:block;font-size:11px;opacity:.58;margin-bottom:2px; }
+      .dir-card-metric strong { display:block;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;overflow-wrap:anywhere; }
+      .dir-detail-lines { grid-template-columns:minmax(0,1fr); }
       #lg-ctrl .btn { flex: none; min-height: 40px; }
       /* controls live in the bottom Filters widget on mobile — hide the buttons but keep the row
          in the DOM so the fixed-position date/compare pickers can still open from the sheet */
@@ -912,81 +930,23 @@
 
     <sc-if value="{{ isCustomers }}" hint-placeholder-val="{{ false }}">
       <section id="sec-customers" data-screen-label="Customers">
-        <sc-if value="{{ continuous }}" hint-placeholder-val="{{ false }}"><h2 style="font-size:16px;font-weight:650;margin:32px 0 0">Customers</h2></sc-if><div class="sd-card">
-        </div><div class="sd-grid2 sd-kpis" style="display:grid;gap:12px;margin-top:16px">
-          <sc-for list="{{ custKpis }}" as="k" hint-placeholder-count="6">
-            <div style="min-width:0">
-              <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="font-size:12.5px;opacity:0.85;border-bottom:1px dotted rgba(var(--lg-ink),0.4);padding-bottom:1px">{{ k.label }}</span></div>
-              <div style="font-weight:650;font-size:15px;margin-top:7px;font-variant-numeric:tabular-nums">{{ k.val }}</div>
-              <div style="font-size:12.5px;margin-top:3px;height:17px"><span style="color:{{ k.dcol }};font-weight:600">{{ k.delta }}</span></div>
-            </div>
-          </sc-for>
-        </div><div style="display:contents">
-        </div><div class="sd-card"><div class="sd-card-h">New vs returning customer orders</div>
-        <sc-if value="{{ customerHistoryUnavailable }}" hint-placeholder-val="{{ false }}"><div style="font-size:13.5px;line-height:1.55;opacity:0.7">Daily acquisition and returning-customer history is not available from the current Shopify dataset. No time series is being estimated.</div></sc-if>
-        <sc-if value="{{ customerHistoryAvailable }}" hint-placeholder-val="{{ true }}">
-        <sc-for list="{{ chartCuL }}" as="chart" hint-placeholder-count="1">
-        <div style="position:relative;margin-top:14px">
-          <svg viewBox="-34 0 894 318" style="display:block;width:100%;height:auto" onMouseMove="{{ chart.move }}" onMouseLeave="{{ chart.leave }}">
-            <sc-for list="{{ chart.grid }}" as="g"><line x1="0" x2="860" y1="{{ g.y }}" y2="{{ g.y }}" style="stroke:rgba(var(--lg-ink),0.08)"></line></sc-for>
-            <line x1="0" x2="860" y1="266" y2="266" style="stroke:rgba(var(--lg-ink),0.22)"></line>
-            <sc-for list="{{ chart.series }}" as="s"><path d="{{ s.d }}" fill="none" stroke="{{ s.col }}" stroke-width="{{ s.w }}" stroke-dasharray="{{ s.dash }}" stroke-linecap="round" stroke-linejoin="round"></path></sc-for>
-            <sc-if value="{{ chart.hx }}" hint-placeholder-val="{{ false }}"><line x1="{{ chart.hx }}" x2="{{ chart.hx }}" y1="16" y2="266" style="stroke:rgba(var(--lg-ink),0.35)" stroke-dasharray="2 3"></line></sc-if>
-            <sc-for list="{{ chart.dots }}" as="dt"><circle cx="{{ dt.x }}" cy="{{ dt.y }}" r="3.5" fill="{{ dt.col }}" style="stroke:var(--color-bg)" stroke-width="1.5"></circle></sc-for>
-          </svg>
-          <sc-for list="{{ chart.grid }}" as="g"><div style="position:absolute;left:3.9%;top:{{ g.lty }};font-size:11px;opacity:0.5;pointer-events:none;line-height:1">{{ g.label }}</div></sc-for>
-          <sc-for list="{{ chart.xTicks }}" as="xt"><div style="position:absolute;top:87.2%;left:{{ xt.lx }};transform:translateX(-50%);font-size:11px;opacity:0.5;pointer-events:none;line-height:1;white-space:nowrap">{{ xt.label }}</div></sc-for>
-          <sc-if value="{{ chart.tip }}" hint-placeholder-val="{{ false }}">
-            <div style="position:absolute;top:8px;left:{{ chart.tip.left }};transform:translateX(-50%);background:var(--color-bg);box-shadow:var(--shadow-lg);padding:9px 13px;border-radius:var(--radius-lg);font-size:12.5px;white-space:nowrap;pointer-events:none;z-index:10">
-              <div style="opacity:0.6;margin-bottom:5px">{{ chart.tip.title }}</div>
-              <sc-for list="{{ chart.tip.rows }}" as="tr2"><div style="display:flex;align-items:center;gap:7px;padding:1px 0"><span style="width:8px;height:8px;border-radius:50%;background:{{ tr2.col }}"></span><span style="opacity:0.7">{{ tr2.name }}</span><span style="margin-left:auto;font-weight:600;padding-left:14px;font-variant-numeric:tabular-nums">{{ tr2.val }}</span></div></sc-for>
-            </div>
+        <sc-if value="{{ continuous }}" hint-placeholder-val="{{ false }}"><h2 style="font-size:16px;font-weight:650;margin:32px 0 0">Customers</h2></sc-if>
+        <div class="sd-grid2 sd-kpis" style="display:grid;gap:12px;margin-top:16px">
+          <sc-for list="{{ custKpis }}" as="k" hint-placeholder-count="6"><div style="min-width:0"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="font-size:12.5px;opacity:0.85;border-bottom:1px dotted rgba(var(--lg-ink),0.4);padding-bottom:1px">{{ k.label }}</span></div><div style="font-weight:650;font-size:15px;margin-top:7px;font-variant-numeric:tabular-nums">{{ k.val }}</div><div style="font-size:12.5px;margin-top:3px;min-height:17px"><span style="color:{{ k.dcol }};font-weight:600">{{ k.delta }}</span></div></div></sc-for>
+        </div>
+        <div class="sd-card">
+          <div class="sd-card-h" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+            <div class="dir-tabs" role="tablist" aria-label="Customer directory views"><sc-for list="{{ directoryTabs }}" as="dt"><button type="button" class="dir-tab" role="tab" aria-selected="{{ dt.selected }}" onClick="{{ dt.click }}" style="background:{{ dt.bg }};font-weight:{{ dt.wt }};color:{{ dt.col }}">{{ dt.label }} <span style="opacity:.58">{{ dt.count }}</span></button></sc-for></div>
+            <div style="position:relative"><button type="button" class="btn btn-secondary" onClick="{{ dirColumnsToggle }}" aria-expanded="{{ dirColumnsOpen }}" aria-label="Choose visible directory columns" style="white-space:nowrap"><i class="ph-duotone ph-columns" style="font-size:15px"></i> Columns {{ dirColumnCount }} of {{ dirColumnTotal }} <i class="ph-duotone ph-caret-down" style="font-size:12px;opacity:.6"></i></button><sc-if value="{{ dirColumnsOpen }}" hint-placeholder-val="{{ false }}"><div onClick="{{ dirColumnsClose }}" style="position:fixed;inset:0;z-index:49"></div><div class="sd-pop" style="position:absolute;right:0;top:calc(100% + 6px);z-index:50;width:240px;max-width:calc(100vw - 40px);background:var(--sd-card);border:1px solid var(--sd-line);border-radius:12px;box-shadow:var(--shadow-lg);padding:6px"><div style="font-size:11.5px;font-weight:600;opacity:.6;padding:6px 8px">Visible columns</div><sc-for list="{{ dirColumnOptions }}" as="dco"><button type="button" onClick="{{ dco.toggle }}" aria-pressed="{{ dco.on }}" style="appearance:none;display:flex;align-items:center;gap:9px;width:100%;border:0;background:{{ dco.bg }};color:inherit;font:inherit;font-size:13px;font-weight:{{ dco.wt }};text-align:left;padding:8px;border-radius:7px;cursor:pointer"><i class="ph-duotone {{ dco.icon }}" style="font-size:16px;color:{{ dco.col }};flex:none"></i><span>{{ dco.label }}</span></button></sc-for></div></sc-if></div>
+          </div>
+          <div style="font-size:12.5px;opacity:.62;margin:-4px 0 12px">{{ directoryNote }}</div>
+          <sc-if value="{{ directoryHasRows }}" hint-placeholder-val="{{ true }}">
+            <div class="dir-desktop-table" style="overflow-x:auto"><table class="table" style="width:100%;min-width:{{ dirTableMinWidth }}"><thead><tr><sc-for list="{{ dirCols }}" as="dc"><th onClick="{{ dc.click }}" style="text-align:{{ dc.al }};white-space:nowrap;cursor:pointer;user-select:none">{{ dc.label }} <i class="ph-duotone {{ dc.icon }}" style="font-size:11px;opacity:{{ dc.op }}"></i></th></sc-for></tr></thead><tbody><sc-for list="{{ dirRows }}" as="r" hint-placeholder-count="8"><tr style="background:{{ r.rowBg }}"><sc-for list="{{ r.cells }}" as="cell"><td style="text-align:{{ cell.al }};font-variant-numeric:{{ cell.nums }};white-space:{{ cell.ws }}"><sc-if value="{{ cell.isName }}" hint-placeholder-val="{{ false }}"><button type="button" class="dir-name-btn" onClick="{{ r.toggle }}" aria-expanded="{{ r.expanded }}">{{ cell.value }} <i class="ph-duotone {{ r.expandIcon }}" style="font-size:12px;color:var(--color-accent-600)"></i></button></sc-if><sc-if value="{{ cell.isValue }}" hint-placeholder-val="{{ true }}">{{ cell.value }}</sc-if></td></sc-for></tr><sc-if value="{{ r.expanded }}" hint-placeholder-val="{{ false }}"><tr><td colspan="{{ dirColumnCount }}" style="padding-top:0"><div class="dir-detail"><div style="font-weight:650">{{ r.detailTitle }}</div><div class="dir-detail-lines"><sc-for list="{{ r.detailLines }}" as="dl"><div class="dir-detail-line">{{ dl }}</div></sc-for></div></div></td></tr></sc-if></sc-for></tbody></table></div>
+            <div class="dir-mobile-list"><sc-for list="{{ dirRows }}" as="r" hint-placeholder-count="8"><div><button type="button" class="dir-card" onClick="{{ r.toggle }}" aria-expanded="{{ r.expanded }}"><div class="dir-card-top"><strong style="font-size:14px;line-height:1.35">{{ r.mobileTitle }}</strong><i class="ph-duotone {{ r.expandIcon }}" style="font-size:15px;color:var(--color-accent-600);flex:none"></i></div><div class="dir-card-metrics"><sc-for list="{{ r.mobileMetrics }}" as="mm"><div class="dir-card-metric"><span>{{ mm.label }}</span><strong>{{ mm.value }}</strong></div></sc-for></div></button><sc-if value="{{ r.expanded }}" hint-placeholder-val="{{ false }}"><div class="dir-detail"><div style="font-weight:650">{{ r.detailTitle }}</div><div class="dir-detail-lines"><sc-for list="{{ r.detailLines }}" as="dl"><div class="dir-detail-line">{{ dl }}</div></sc-for></div></div></sc-if></div></sc-for></div>
           </sc-if>
+          <sc-if value="{{ directoryEmpty }}" hint-placeholder-val="{{ false }}"><div style="padding:34px 12px;text-align:center"><i class="ph-duotone ph-buildings" style="font-size:28px;color:var(--color-accent-500)"></i><div style="font-weight:650;margin-top:8px">{{ directoryEmptyTitle }}</div><div style="font-size:13px;opacity:.65;margin-top:4px">{{ directoryEmptyText }}</div></div></sc-if>
         </div>
-        <div style="display:flex;gap:22px;flex-wrap:wrap;margin-top:10px">
-          <sc-for list="{{ chart.legend }}" as="lg"><span style="display:inline-flex;align-items:center;gap:8px;font-size:13px;opacity:0.85"><span style="width:18px;height:0;border-top:2.5px {{ lg.ls }} {{ lg.col }}"></span>{{ lg.name }}</span></sc-for>
-        </div>
-        </sc-for>
-        </sc-if>
-
-        </div><div class="sd-card"><div class="sd-card-h">Acquisition cohorts &middot; repeat behaviour</div>
-        <div style="overflow-x:auto">
-          <table class="table" style="width:100%;min-width:760px">
-            <thead><tr><th>Cohort</th><th style="text-align:right">Customers</th><th style="text-align:right">Repeat rate</th><th style="text-align:right">Orders / cust.</th><th style="text-align:right">90-day LTV</th><th style="width:150px">Revenue retained</th></tr></thead>
-            <tbody>
-              <sc-for list="{{ cohortRows }}" as="r" hint-placeholder-count="6">
-                <tr>
-                  <td>{{ r.month }}</td>
-                  <td style="text-align:right;font-variant-numeric:tabular-nums">{{ r.customers }}</td>
-                  <td style="text-align:right;font-variant-numeric:tabular-nums">{{ r.repeat }}</td>
-                  <td style="text-align:right;font-variant-numeric:tabular-nums">{{ r.opc }}</td>
-                  <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600">{{ r.ltv }}</td>
-                  <td><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:4px;background:var(--color-neutral-200);border-radius:2px"><div style="height:4px;background:var(--lg-bar);border-radius:2px;width:{{ r.barW }}"></div></div><span style="font-size:12px;opacity:0.6;font-variant-numeric:tabular-nums">{{ r.retained }}</span></div></td>
-                </tr>
-              </sc-for>
-            </tbody>
-          </table>
-        </div>
-
-        </div><div class="sd-card"><div class="sd-card-h">Top wholesale accounts</div>
-        <div style="overflow-x:auto">
-          <table class="table" style="width:100%;min-width:700px">
-            <thead><tr><th>Account</th><th>Region</th><th style="text-align:right">Orders</th><th style="text-align:right">Spend</th><th style="text-align:right">Reorder cadence</th><th>Status</th></tr></thead>
-            <tbody>
-              <sc-for list="{{ custRows }}" as="r" hint-placeholder-count="6">
-                <tr>
-                  <td>{{ r.name }}</td>
-                  <td>{{ r.region }}</td>
-                  <td style="text-align:right;font-variant-numeric:tabular-nums">{{ r.orders }}</td>
-                  <td style="text-align:right;font-variant-numeric:tabular-nums">{{ r.spend }}</td>
-                  <td style="text-align:right;font-variant-numeric:tabular-nums">{{ r.cadence }}</td>
-                  <td><span class="tag {{ r.tagClass }}">{{ r.tag }}</span></td>
-                </tr>
-              </sc-for>
-            </tbody>
-          </table>
-        </div>
-      </div></section>
+      </section>
     </sc-if>
 
     <sc-if value="{{ isAds }}" hint-placeholder-val="{{ false }}">
@@ -1425,6 +1385,12 @@ class Component extends DCLogic {
       accentHex:(hp.ah && /^[0-9a-fA-F]{6}$/.test(hp.ah)) ? '#' + hp.ah : (ls.brandV === 2 && ls.accentHex ? ls.accentHex : '#c9377e'),
       hsv:null, accHexDraft:null, accPickOpen:false, searchQ:'', searchExp:false, selKpi:'gross', chartOn:{}, ordSort:null, prodSort:null, productStatus:'active', expandedProduct:null, prodColumnsOpen:false,
       prodColOn:{ name:true, sku:false, status:true, vendor:false, tags:false, price:true, cost:false, gm:false, units:true, sales:false, stock:true, locations:false, updatedAt:false },
+      directoryTab:'customers', directoryColumnsOpen:false, dirSort:null, expandedDirectory:null,
+      dirColOn:{
+        customers:{ name:true, company:true, orders:true, spend:true, lastOrder:true, aov:false, firstOrder:false, refunds:false, returns:false, region:false, marketing:false, tags:false, state:false },
+        companies:{ name:true, status:true, locations:true, orders:true, spend:true, contacts:false, lastOrder:false, mainContact:false, customerSince:false, metafields:false },
+        locations:{ name:true, company:true, region:true, orders:true, spend:true, lastOrder:false, paymentTerms:false, catalogs:false, tax:false, currency:false },
+      },
       brandName:ls.brandV >= 3 && ls.brandName ? ls.brandName : 'Flavour Blaster', brandTag:ls.brandV >= 3 && ls.brandTag ? ls.brandTag : 'The Art of Aroma, Perfected!', logoData:ls.brandV >= 3 && ls.logoData ? ls.logoData : './assets/flavour-blaster-b.jpeg', growthO:ls.growthO ?? null, coverO:ls.coverO ?? null, retO:ls.retO ?? null, areaO:ls.areaO ?? null, dataMode:'live', dataUrl:'/api/dashboard',
       dataStatus:'loading', dataError:null, dataUpdatedAt:null, dataCoverageStart:null, dataCoverageEnd:null, dataBaseCurrency:null, livePayload:null,
       repCur:ls.repCur || 'USD', fxAuto:ls.fxAuto ?? true, fxFetched:null, targetMode:ls.targetMode || 'growth', targetAbs:ls.targetAbs ?? null, chCfg:ls.chCfg || {}, rgCfg:ls.rgCfg || {},
@@ -2242,46 +2208,41 @@ class Component extends DCLogic {
       { label:'Sell-through (top 12)', val:'71.2%', ...this.delta(0.712, 0.684) },
     ];
 
-    const liveCustomers = st.dataStatus === 'live' ? (st.livePayload?.customers || {}) : null;
-    const custN = liveCustomers ? (+liveCustomers.customers || 0) : Math.round(cur.o * 0.74);
-    const pCustN = liveCustomers ? custN : Math.round(prev.o * 0.74);
-    const newCustN = liveCustomers ? (+liveCustomers.newCustomers || 0) : custN * 0.62;
-    const repeatRate = liveCustomers ? (custN ? (+liveCustomers.repeatCustomers || 0) / custN : 0) : 0.384;
-    const ordersPerCustomer = custN ? cur.o / custN : 0;
-    const custKpis = liveCustomers ? [
-      { label:'Customers', val:this.num(custN), delta:'Live Shopify customers', dcol:'inherit' },
-      { label:'New customers', val:this.num(newCustN), delta:'First order in range', dcol:'inherit' },
-      { label:'Repeat rate', val:this.pct(repeatRate), delta:'Known customer history', dcol:'inherit' },
-      { label:'Orders per customer', val:ordersPerCustomer.toFixed(2), delta:'Current range', dcol:'inherit' },
-      { label:'Net sales / customer', val:this.money2(custN ? cur.ns / custN : 0), delta:'Current range', dcol:'inherit' },
-      { label:'90-day LTV', val:'—', delta:'Cohort history unavailable', dcol:'inherit' },
-    ] : [
-      { label:'Customers', val:this.num(custN), ...this.delta(custN, pCustN) },
-      { label:'New customers', val:this.num(custN * 0.62), ...this.delta(custN * 0.62, pCustN * 0.64) },
-      { label:'Repeat rate', val:this.pct(0.384), ...this.delta(0.384, 0.371) },
-      { label:'Orders per customer', val:'1.28', ...this.delta(1.28, 1.24) },
-      { label:'Net sales / customer', val:this.money2(custN ? cur.ns / custN : 0), ...this.delta(custN ? cur.ns / custN : 0, pCustN ? prev.ns / pCustN : 0) },
-      { label:'90-day LTV', val:this.money2(148.20), ...this.delta(148.2, 141.6) },
+    const directory = st.dataStatus === 'live' && st.livePayload?.customerDirectory ? st.livePayload.customerDirectory : { summary:{}, customers:[], companies:[], locations:[] };
+    const directorySummary = directory.summary || {};
+    const moneyCode = (v, code) => { try { return new Intl.NumberFormat('en-GB', { style:'currency', currency:code || st.dataBaseCurrency || 'GBP', maximumFractionDigits:0 }).format(+v || 0); } catch (e) { return this.money(+v || 0); } };
+    const dateLondon = v => v ? new Date(v).toLocaleDateString('en-GB', { timeZone:'Europe/London', day:'2-digit', month:'short', year:'numeric' }) : '—';
+    const custKpis = [
+      { label:'Customers', val:this.num(+directorySummary.customers || 0), delta:'All Shopify customer records', dcol:'inherit' },
+      { label:'B2B companies', val:this.num(+directorySummary.companies || 0), delta:'Shopify Companies', dcol:'inherit' },
+      { label:'Company locations', val:this.num(+directorySummary.locations || 0), delta:'B2B branches and offices', dcol:'inherit' },
+      { label:'Company contacts', val:this.num(+directorySummary.contacts || 0), delta:'Linked Shopify customers', dcol:'inherit' },
+      { label:'Customer lifetime spend', val:moneyCode(directorySummary.customerLifetimeSpend, st.dataBaseCurrency), delta:'Shopify lifetime totals', dcol:'inherit' },
+      { label:'Company lifetime spend', val:moneyCode(directorySummary.companyLifetimeSpend, st.dataBaseCurrency), delta:'Across all B2B locations', dcol:'inherit' },
     ];
-    const cohortRows = liveCustomers ? [] : [0, 1, 2, 3, 4, 5].map(i => {
-      const mIdx = pm - 5 + i, dt = new Date(Date.UTC(nowD.getUTCFullYear(), mIdx, 1));
-      const rc = this.mulberry(9000 + mIdx);
-      const mA = this.agg(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), 1), Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth() + 1, 0));
-      const customers = Math.round(mA.o * 0.46);
-      const maturity = Math.min(1, (5 - i + 1) / 5);
-      const repeat = (0.19 + 0.22 * maturity) * (0.92 + 0.16 * rc());
-      const opc = 1 + repeat * (0.9 + 0.3 * rc());
-      const aov = mA.o ? mA.ns / mA.o : 0;
-      const ltv = aov * opc;
-      return { month:this.MO[dt.getUTCMonth()] + ' ' + dt.getUTCFullYear(), customers:this.num(customers), repeat:this.pct(repeat),
-        opc:opc.toFixed(2), ltv:this.money2(ltv), retained:this.pct(repeat * opc / 2), barW:(Math.min(1, repeat * opc / 1.4) * 100).toFixed(0) + '%' };
-    });
-    const ACC = [['Westlake Volleyball Club','United States',.24,'21d'],['Northshore Beach Academy','Australia',.18,'27d'],['London Lions VC','United Kingdom',.15,'34d'],['Rheinland SportHaus','Europe',.13,'29d'],['Pacific Prep Athletics','United States',.11,'45d'],['Brighton Volley Co-op','United Kingdom',.08,'61d']];
-    const custRows = liveCustomers && Array.isArray(liveCustomers.wholesaleAccounts)
-      ? liveCustomers.wholesaleAccounts.map(account => ({ name:account.name || 'Wholesale account', region:(this.RG.find(g => g.k === account.region_code) || {}).n || 'Other', cadence:'—',
-          orders:this.num(account.orders), spend:this.money(account.net_sales), tag:'Live', tagClass:'tag-accent' }))
-      : ACC.map(([name, region, w, cadence], i) => ({ name, region, cadence, orders:this.num(cur.ch.b2b.o * w), spend:this.money(cur.ch.b2b.s * w),
-          tag:i < 4 ? 'Active' : 'Renewal due', tagClass:i < 4 ? 'tag-accent' : 'tag-accent-2' }));
+    const dirDefs = {
+      customers:[['name','Customer','left'],['company','Company','left'],['orders','Orders','right'],['spend','Lifetime spend','right'],['lastOrder','Last order','left'],['aov','AOV','right'],['firstOrder','First order','left'],['refunds','Refunds','right'],['returns','Returns','right'],['region','Region','left'],['marketing','Marketing','left'],['tags','Tags','left'],['state','State','left']],
+      companies:[['name','Company','left'],['status','Status','left'],['locations','Locations','right'],['orders','Orders','right'],['spend','Lifetime spend','right'],['contacts','Contacts','right'],['lastOrder','Last order','left'],['mainContact','Main contact','left'],['customerSince','Customer since','left'],['metafields','Metafields','right']],
+      locations:[['name','Location','left'],['company','Company','left'],['region','Country / region','left'],['orders','Orders','right'],['spend','Lifetime spend','right'],['lastOrder','Last order','left'],['paymentTerms','Payment terms','left'],['catalogs','Catalogs','left'],['tax','Tax','left'],['currency','Currency','left']],
+    };
+    const customerRaw = (directory.customers || []).map(c => ({ key:c.key, name:c.name || 'Customer', company:(c.company_names || []).join(', ') || '—', orders:+c.order_count || 0, spend:+c.lifetime_spend || 0, spendText:moneyCode(c.lifetime_spend,c.currency_code), lastOrder:c.last_order_at || '', lastOrderText:dateLondon(c.last_order_at), aov:+c.average_order_value || 0, aovText:moneyCode(c.average_order_value,c.currency_code), firstOrder:c.first_order_at || '', firstOrderText:dateLondon(c.first_order_at), refunds:+c.refunds || 0, refundsText:moneyCode(c.refunds,c.currency_code), returns:+c.returned_quantity || 0, region:(this.RG.find(g=>g.k===c.region_code)||{}).n || c.country_code || 'Other', marketing:String(c.marketing_status || 'unknown').replace(/_/g,' ').toLowerCase(), tags:(c.tags || []).join(', ') || '—', state:c.state || '—', detailLines:['Company: '+((c.company_names||[]).join(', ')||'—'),'Region: '+((this.RG.find(g=>g.k===c.region_code)||{}).n||c.country_code||'Other'),'First order: '+dateLondon(c.first_order_at),'Last order: '+dateLondon(c.last_order_at),'Average order value: '+moneyCode(c.average_order_value,c.currency_code),'Refunds: '+moneyCode(c.refunds,c.currency_code),'Returned items: '+this.num(c.returned_quantity),'Marketing: '+String(c.marketing_status||'unknown').replace(/_/g,' ').toLowerCase(),'Tags: '+((c.tags||[]).join(', ')||'—')].concat((c.recent_orders||[]).map(o=>'Order '+o.order+' · '+dateLondon(o.processed_at)+' · '+moneyCode(o.total_sales,o.currency_code)+' · '+(o.fulfillment_status||'unknown'))) }));
+    const companyRaw = (directory.companies || []).map(c => ({ key:c.key, name:c.name || 'Company', status:c.status || 'active', locations:+c.locations_count || 0, orders:+c.order_count || 0, spend:+c.lifetime_spend || 0, spendText:moneyCode(c.lifetime_spend,c.currency_code), contacts:+c.contacts_count || 0, lastOrder:c.last_order_at || '', lastOrderText:dateLondon(c.last_order_at), mainContact:c.main_contact_name || '—', customerSince:c.customer_since || '', customerSinceText:dateLondon(c.customer_since), metafields:+c.metafield_count || 0, detailLines:['Main contact: '+(c.main_contact_name||'—'),'Customer since: '+dateLondon(c.customer_since),'Orders: '+this.num(c.order_count),'Lifetime spend: '+moneyCode(c.lifetime_spend,c.currency_code)].concat((c.contacts||[]).map(p=>'Contact · '+(p.name||'Unnamed')+(p.title?' · '+p.title:'')+(p.is_main_contact?' · Main contact':''))).concat((c.locations||[]).map(l=>'Location · '+(l.name||'Unnamed')+' · '+(l.city||l.region||l.country_code||'—')+' · '+moneyCode(l.lifetime_spend,l.currency_code)+' · '+(l.payment_terms||'Standard'))) }));
+    const locationRaw = (directory.locations || []).map(l => ({ key:l.key, name:l.name || 'Location', company:l.company_name || '—', region:[l.city,l.region,l.country_code].filter(Boolean).join(', ') || '—', orders:+l.order_count || 0, spend:+l.lifetime_spend || 0, spendText:moneyCode(l.lifetime_spend,l.currency_code), lastOrder:l.last_order_at || '', lastOrderText:dateLondon(l.last_order_at), paymentTerms:l.payment_terms || 'Standard', catalogs:(l.catalogs || []).join(', ') || '—', tax:l.tax_exempt ? 'Tax exempt' : 'Taxable', currency:l.currency_code || '—', detailLines:['Company: '+(l.company_name||'—'),'Location: '+([l.city,l.region,l.country_code].filter(Boolean).join(', ')||'—'),'Orders: '+this.num(l.order_count),'Lifetime spend: '+moneyCode(l.lifetime_spend,l.currency_code),'Last order: '+dateLondon(l.last_order_at),'Payment terms: '+(l.payment_terms||'Standard'),'Catalogs: '+((l.catalogs||[]).join(', ')||'—'),'Tax: '+(l.tax_exempt?'Tax exempt':'Taxable'),'Currency: '+(l.currency_code||'—')] }));
+    const dirSource = st.directoryTab === 'companies' ? companyRaw : st.directoryTab === 'locations' ? locationRaw : customerRaw;
+    const dirDef = dirDefs[st.directoryTab];
+    const dirOn = st.dirColOn[st.directoryTab];
+    const dirColumnCount = dirDef.filter(([k2])=>dirOn[k2]).length;
+    const ds = st.dirSort || { col:st.directoryTab === 'customers' ? 'lastOrder' : 'spend', dir:-1 };
+    const dirCols = dirDef.filter(([k2])=>dirOn[k2]).map(([k2,label,al])=>({label,al,icon:ds.col===k2?(ds.dir>0?'ph-caret-up':'ph-caret-down'):'ph-caret-up-down',op:ds.col===k2?'1':'.35',click:()=>this.setState({dirSort:{col:k2,dir:ds.col===k2?-ds.dir:(['name','company','region','status'].includes(k2)?1:-1)}})}));
+    const dirColumnOptions = dirDef.map(([k2,label])=>{const on=!!dirOn[k2];return{label,on,icon:on?'ph-check-square':'ph-square',col:on?'var(--color-accent-700)':'inherit',bg:on?'var(--color-neutral-200)':'transparent',wt:on?'600':'400',toggle:()=>{if(on&&dirColumnCount===1)return;this.setState({dirColOn:{...st.dirColOn,[st.directoryTab]:{...dirOn,[k2]:!on}},dirSort:on&&ds.col===k2?null:st.dirSort});}};});
+    const cellText=(r,k2)=>k2==='spend'?r.spendText:k2==='lastOrder'?r.lastOrderText:k2==='firstOrder'?r.firstOrderText:k2==='aov'?r.aovText:k2==='refunds'?r.refundsText:k2==='customerSince'?r.customerSinceText:(r[k2]??'—');
+    const dirRows=dirSource.slice().sort((a,b)=>{const x=a[ds.col],y=b[ds.col];return(typeof x==='number'&&typeof y==='number'?x-y:String(x||'').localeCompare(String(y||'')))*ds.dir;}).map(r=>{const expanded=st.expandedDirectory===r.key;const cells=dirDef.filter(([k2])=>dirOn[k2]).map(([k2,,al],i)=>({value:cellText(r,k2),al,isName:i===0,isValue:i!==0,nums:al==='right'?'tabular-nums':'normal',ws:['lastOrder','firstOrder','customerSince'].includes(k2)?'nowrap':'normal'}));const metricDefs=dirDef.filter(([k2])=>dirOn[k2]&&k2!=='name').slice(0,4);return{...r,cells,expanded,rowBg:expanded?'var(--color-accent-100)':'transparent',expandIcon:expanded?'ph-caret-up':'ph-caret-down',toggle:()=>this.setState({expandedDirectory:expanded?null:r.key}),detailTitle:(st.directoryTab==='customers'?'Customer':st.directoryTab==='companies'?'Company':'Location')+' details',mobileTitle:r.name,mobileMetrics:metricDefs.map(([k2,label])=>({label,value:cellText(r,k2)}))};});
+    const directoryTabs=[['customers','Customers',directorySummary.customers],['companies','Companies',directorySummary.companies],['locations','Locations',directorySummary.locations]].map(([k2,label,count])=>{const selected=st.directoryTab===k2;return{label,count:this.num(+count||0),selected,bg:selected?'var(--sd-card)':'transparent',col:selected?'var(--color-accent-800)':'inherit',wt:selected?'650':'450',click:()=>this.setState({directoryTab:k2,dirSort:null,expandedDirectory:null,directoryColumnsOpen:false})};});
+    const directoryNote=(+directorySummary.companies||0)||(+directorySummary.locations||0)?'Live Shopify customer and B2B directory · protected contact fields remain server-side':'Customer records are ready. B2B companies and locations will appear after the disabled complete directory workflow is credentialed and run.';
+    const directoryHasRows=dirRows.length>0, directoryEmpty=!directoryHasRows;
+    const directoryEmptyTitle=st.directoryTab==='customers'?'No customers returned':st.directoryTab==='companies'?'No B2B companies returned':'No B2B locations returned';
+    const directoryEmptyText=st.directoryTab==='customers'?'Run the approved complete directory sync to populate customer details.':'This view will populate after the approved Shopify B2B directory sync runs.';
+    const custRows=customerRaw.map(c=>({name:c.name,region:c.region,spend:c.spendText}));
 
     const goView = (v) => () => { this.setState({ view:v, continuous:false, hi:null }); window.scrollTo(0, 0); };
     const flags = [
@@ -2392,10 +2353,12 @@ class Component extends DCLogic {
           prodRows.map(r => [r.name, r.sku, r.price, r.units, r.sales, r.margin, r.retRate, r.stock, r.cover])],
         ['Recent orders', ['Order','Date','Customer','Channel','Region','Items','Total','Status','Tags'],
           orderRows.map(o => [o.id, o.time, o.cust, o.ch, o.region, o.items, o.total, o.status, o.tagsTxt])],
-        ['Cohorts', ['Cohort','Customers','Repeat rate','Orders per customer','90-day LTV'],
-          cohortRows.map(r => [r.month, r.customers, r.repeat, r.opc, r.ltv])],
-        ['Wholesale accounts', ['Account','Region','Orders','Spend','Reorder cadence','Status'],
-          custRows.map(r => [r.name, r.region, r.orders, r.spend, r.cadence, r.tag])],
+        ['Customers', ['Customer','Company','Orders','Lifetime spend','Last order','Region'],
+          customerRaw.map(r => [r.name, r.company, r.orders, r.spendText, r.lastOrderText, r.region])],
+        ['B2B companies', ['Company','Locations','Contacts','Orders','Lifetime spend','Last order'],
+          companyRaw.map(r => [r.name, r.locations, r.contacts, r.orders, r.spendText, r.lastOrderText])],
+        ['B2B company locations', ['Location','Company','Country / region','Orders','Lifetime spend','Payment terms'],
+          locationRaw.map(r => [r.name, r.company, r.region, r.orders, r.spendText, r.paymentTerms])],
       ];
       let out = (this.state.brandName || 'Dashboard') + ' \u2014 ' + rangeLabel.replace(/\u2013/g, '-') + '\n';
       for (const [t, hds, rows] of secs) out += '\n' + t + '\n' + hds.map(csvEsc).join(',') + '\n' + rows.map(r => r.map(csvEsc).join(',')).join('\n') + '\n';
@@ -2584,7 +2547,6 @@ class Component extends DCLogic {
       retVal:String(+(retCeil * 100).toFixed(1)), setRet:(e) => this.setState({ retO:Math.max(0.5, +e.target.value || 0.5) }),
       isOverview:st.continuous || st.view === 'overview', isChannels:st.continuous || st.view === 'channels', isRegions:st.continuous || st.view === 'regions',
       isOrders:st.continuous || st.view === 'orders', isProducts:st.continuous || st.view === 'products', isCustomers:st.continuous || st.view === 'customers',
-      customerHistoryUnavailable:st.dataStatus === 'live', customerHistoryAvailable:st.dataStatus !== 'live',
       isAds:st.continuous || st.view === 'ads', adUnavailable:st.dataStatus === 'live', adDataAvailable:st.dataStatus !== 'live', adKpis, chartAdsL:[chartAds], adPlatRows, adCampCols, adCampRows,
       ordCols, ordTagQ, ordTagInput:e => this.setState({ ordTagQ:e.target.value }), ordTagReset:() => this.setState({ ordTagQ:'' }), productStatus:st.productStatus, setProductStatus:e => this.setState({ productStatus:e.target.value, prodSort:null, expandedProduct:null, prodColumnsOpen:false }), prodCols,
       prodColumnOptions, prodColumnCount, prodTableMinWidth:Math.max(720, 220 + Math.max(0, prodColumnCount - 1) * 105) + 'px', prodColumnsOpen:st.prodColumnsOpen,
@@ -2592,7 +2554,10 @@ class Component extends DCLogic {
       showProdName:!!st.prodColOn.name, showProdSku:!!st.prodColOn.sku, showProdStatus:!!st.prodColOn.status, showProdVendor:!!st.prodColOn.vendor, showProdTags:!!st.prodColOn.tags,
       showProdPrice:!!st.prodColOn.price, showProdCost:!!st.prodColOn.cost, showProdMargin:!!st.prodColOn.gm, showProdUnits:!!st.prodColOn.units, showProdSales:!!st.prodColOn.sales,
       showProdStock:!!st.prodColOn.stock, showProdLocations:!!st.prodColOn.locations, showProdUpdated:!!st.prodColOn.updatedAt,
-      kpis, chRows, chCards, regRows, regCards, heat, ordKpis, orderRows, prodRows, prodKpis, deadRows, returnRows, custKpis, custRows, cohortRows, filterDDs,
+      directoryTabs, directoryNote, directoryHasRows, directoryEmpty, directoryEmptyTitle, directoryEmptyText, dirCols, dirRows,
+      dirColumnOptions, dirColumnCount, dirColumnTotal:dirDef.length, dirTableMinWidth:Math.max(660, 210 + Math.max(0, dirColumnCount - 1) * 120) + 'px', dirColumnsOpen:st.directoryColumnsOpen,
+      dirColumnsToggle:()=>this.setState({directoryColumnsOpen:!st.directoryColumnsOpen}), dirColumnsClose:()=>this.setState({directoryColumnsOpen:false}),
+      kpis, chRows, chCards, regRows, regCards, heat, ordKpis, orderRows, prodRows, prodKpis, deadRows, returnRows, custKpis, custRows, filterDDs,
     };
   }
   buildCal(baseT, selS, selE, pick) {

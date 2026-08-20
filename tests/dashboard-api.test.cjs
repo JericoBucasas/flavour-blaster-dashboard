@@ -30,7 +30,7 @@ test('dashboard API returns a controlled error for invalid dates', async () => {
   assert.equal(res.body.code, 'INVALID_DATE');
 });
 
-test('dashboard API merges the sales snapshot with the complete product catalog', async () => {
+test('dashboard API merges sales, product catalog, and customer company directory', async () => {
   const previousUrl = process.env.SUPABASE_URL;
   const previousKey = process.env.SUPABASE_SECRET_KEY;
   const previousFetch = global.fetch;
@@ -40,7 +40,8 @@ test('dashboard API merges the sales snapshot with the complete product catalog'
   global.fetch = async (url) => {
     requests.push(url);
     if (url.endsWith('/fb_dashboard_snapshot')) return { ok:true, json:async () => ({ daily:[], recentOrders:[] }) };
-    return { ok:true, json:async () => ({ summary:{ products:173 }, products:[{ title:'Product' }] }) };
+    if (url.endsWith('/fb_product_catalog')) return { ok:true, json:async () => ({ summary:{ products:173 }, products:[{ title:'Product' }] }) };
+    return { ok:true, json:async () => ({ summary:{ customers:243 }, customers:[{ name:'Customer' }], companies:[], locations:[] }) };
   };
   try {
     const res = response();
@@ -49,7 +50,32 @@ test('dashboard API merges the sales snapshot with the complete product catalog'
     assert.equal(res.body.status, 'live');
     assert.equal(res.body.data.productCatalog.summary.products, 173);
     assert.equal(res.body.data.productCatalog.products.length, 1);
-    assert.equal(requests.length, 2);
+    assert.equal(res.body.data.customerDirectory.summary.customers, 243);
+    assert.equal(res.body.data.customerDirectory.customers.length, 1);
+    assert.equal(requests.length, 3);
+  } finally {
+    global.fetch = previousFetch;
+    if (previousUrl == null) delete process.env.SUPABASE_URL; else process.env.SUPABASE_URL = previousUrl;
+    if (previousKey == null) delete process.env.SUPABASE_SECRET_KEY; else process.env.SUPABASE_SECRET_KEY = previousKey;
+  }
+});
+
+test('dashboard API rejects an invalid customer directory payload', async () => {
+  const previousUrl = process.env.SUPABASE_URL;
+  const previousKey = process.env.SUPABASE_SECRET_KEY;
+  const previousFetch = global.fetch;
+  process.env.SUPABASE_URL = 'https://hnmmlfelaezmijbbwzsg.supabase.co';
+  process.env.SUPABASE_SECRET_KEY = '[test-secret]';
+  global.fetch = async (url) => {
+    if (url.endsWith('/fb_dashboard_snapshot')) return { ok:true, json:async () => ({ daily:[], recentOrders:[] }) };
+    if (url.endsWith('/fb_product_catalog')) return { ok:true, json:async () => ({ products:[] }) };
+    return { ok:true, json:async () => ({ customers:[] }) };
+  };
+  try {
+    const res = response();
+    await handler({ method:'GET', query:{} }, res);
+    assert.equal(res.statusCode, 502);
+    assert.equal(res.body.code, 'CUSTOMER_DIRECTORY_INVALID');
   } finally {
     global.fetch = previousFetch;
     if (previousUrl == null) delete process.env.SUPABASE_URL; else process.env.SUPABASE_URL = previousUrl;

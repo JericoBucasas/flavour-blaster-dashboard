@@ -9,7 +9,7 @@ const workflowDir = path.join(__dirname, '..', 'workflows', 'n8n');
 const files = fs.readdirSync(workflowDir).filter((name) => name.endsWith('.json'));
 
 test('all committed n8n workflows are disabled behind a closed gate', () => {
-  assert.equal(files.length, 3);
+  assert.equal(files.length, 4);
   for (const file of files) {
     const workflow = JSON.parse(fs.readFileSync(path.join(workflowDir, file), 'utf8'));
     assert.equal(workflow.active, false, file);
@@ -40,8 +40,8 @@ test('orders query uses Shopify shop currency and does not request customer emai
   assert.match(normalize, /email: null/);
 });
 
-test('data workflows enforce bounded cursor pagination, retries, throttling and success-only checkpoints', () => {
-  for (const file of files.filter((name) => !name.includes('health'))) {
+test('order and product workflows enforce bounded cursor pagination, retries, throttling and success-only checkpoints', () => {
+  for (const file of files.filter((name) => name.includes('orders') || name.includes('products'))) {
     const workflow = JSON.parse(fs.readFileSync(path.join(workflowDir, file), 'utf8'));
     const shopify = workflow.nodes.find((node) => node.name.startsWith('Shopify GraphQL'));
     const advance = workflow.nodes.find((node) => node.name === 'Advance Cursor After Successful Writes');
@@ -78,6 +78,33 @@ test('data workflows enforce bounded cursor pagination, retries, throttling and 
       assert.deepEqual(finalizerParents, ['More Product Pages?'], file);
     }
   }
+});
+
+test('customer company workflow is a bounded six-hour London full sync with success-only finalization', () => {
+  const workflow = JSON.parse(fs.readFileSync(path.join(workflowDir, 'fb-dashboard-customer-company-directory.disabled.json'), 'utf8'));
+  assert.equal(workflow.settings.timezone, 'Europe/London');
+  assert.equal(workflow.meta.targetFolderId, 'BafBm52YFWfYw7sU');
+  assert.equal(workflow.meta.shopDomain, 'jetchill-mixology.myshopify.com');
+  const schedule = workflow.nodes.find((node) => node.name === 'Schedule - Every 6 Hours (London)');
+  assert.ok(JSON.stringify(schedule.parameters).includes('0 0 */6 * * *'));
+  const shopifyReads = workflow.nodes.filter((node) => node.name.startsWith('Shopify GraphQL'));
+  assert.equal(shopifyReads.length, 2);
+  for (const node of shopifyReads) {
+    assert.equal(node.credentials.shopifyOAuth2Api.id, 'TOFvh8rHI1pD468B');
+    assert.equal(node.retryOnFail, true);
+    assert.equal(node.maxTries, 3);
+  }
+  const customerAdvance = workflow.nodes.find((node) => node.name === 'Advance Customer Cursor After Successful Writes');
+  const companyAdvance = workflow.nodes.find((node) => node.name === 'Advance Company Cursor After Successful Writes');
+  assert.match(customerAdvance.parameters.jsCode, /CUSTOMERS_PAGE_LIMIT_REACHED/);
+  assert.match(companyAdvance.parameters.jsCode, /COMPANIES_PAGE_LIMIT_REACHED/);
+  const finalizer = workflow.nodes.find((node) => node.name === 'Finalize Customer Company Soft Deletions [CREDENTIAL REQUIRED]');
+  assert.match(finalizer.parameters.url, /fb_finalize_customer_company_sync/);
+  const checkpoint = workflow.nodes.find((node) => node.name === 'Supabase Upsert Success Checkpoint [CREDENTIAL REQUIRED]');
+  const checkpointParents = Object.entries(workflow.connections)
+    .filter(([, outputs]) => JSON.stringify(outputs).includes(checkpoint.name))
+    .map(([name]) => name);
+  assert.deepEqual(checkpointParents, [finalizer.name]);
 });
 
 test('health workflow queries only columns present in the approved sync-state schema', () => {

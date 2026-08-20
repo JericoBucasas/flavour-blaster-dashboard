@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parseDate, buildSnapshotRequest, buildCatalogRequest, sanitizeSnapshot } = require('../lib/dashboard-request');
+const { parseDate, buildSnapshotRequest, buildCatalogRequest, buildDirectoryRequest, sanitizeSnapshot } = require('../lib/dashboard-request');
 
 test('parseDate accepts ISO dates and falls back safely', () => {
   assert.equal(parseDate('2026-08-20', '2025-01-01'), '2026-08-20');
@@ -21,6 +21,14 @@ test('snapshot request keeps the secret in server headers only', () => {
 test('catalog request keeps the secret server-side and targets the catalog RPC', () => {
   const request = buildCatalogRequest('https://hnmmlfelaezmijbbwzsg.supabase.co/', '[test-secret]');
   assert.equal(request.url, 'https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/rpc/fb_product_catalog');
+  assert.equal(request.options.headers.apikey, '[test-secret]');
+  assert.equal(request.options.headers.Authorization, undefined);
+  assert.equal(request.options.body, '{}');
+});
+
+test('directory request keeps the secret server-side and targets the safe directory RPC', () => {
+  const request = buildDirectoryRequest('https://hnmmlfelaezmijbbwzsg.supabase.co/', '[test-secret]');
+  assert.equal(request.url, 'https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/rpc/fb_customer_company_directory');
   assert.equal(request.options.headers.apikey, '[test-secret]');
   assert.equal(request.options.headers.Authorization, undefined);
   assert.equal(request.options.body, '{}');

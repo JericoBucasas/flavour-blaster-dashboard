@@ -1,0 +1,863 @@
+{
+  "name": "FB Dashboard | Complete Customers, Companies & Locations [DISABLED]",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "DISABLED DEVELOPMENT WORKFLOW. Full customer and B2B company directory. Requires read_customers or read_companies, the approved Shopify OAuth credential, and the Flavour Blaster Supabase service-role credential. Never activate or backfill without separate approval.",
+        "height": 220,
+        "width": 520
+      },
+      "id": "read-before-testing",
+      "name": "Read Before Testing",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        260,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 0 */6 * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-every-6-hours-london-",
+      "name": "Schedule - Every 6 Hours (London)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        510,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const DEVELOPMENT_GATE = false;\nif (!DEVELOPMENT_GATE) throw new Error('DEVELOPMENT_GATE_CLOSED');\nreturn items;"
+      },
+      "id": "closed-development-gate",
+      "name": "Closed Development Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const runStartedAt = new Date().toISOString();\nreturn [{json:{runStartedAt,end:runStartedAt,after:null,page:1,maxPages:100,pagesRead:0,customersRead:0}}];"
+      },
+      "id": "initialize-customer-directory-sync",
+      "name": "Initialize Customer Directory Sync",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1010,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://jetchill-mixology.myshopify.com/admin/api/2026-07/graphql.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ query: \"query DashboardCustomers($after: String) {\\n  customers(first: 100, after: $after, sortKey: ID) {\\n    pageInfo { hasNextPage endCursor }\\n    nodes {\\n      id legacyResourceId displayName firstName lastName createdAt updatedAt locale state note tags dataSaleOptOut numberOfOrders taxExempt taxExemptions\\n      amountSpent { amount currencyCode }\\n      defaultEmailAddress { emailAddress marketingState marketingOptInLevel marketingUpdatedAt validFormat }\\n      defaultPhoneNumber { phoneNumber marketingState marketingOptInLevel marketingUpdatedAt }\\n      defaultAddress { address1 address2 city province provinceCode zip country countryCodeV2 phone company }\\n      addressesV2(first: 100) { nodes { id address1 address2 city province provinceCode zip country countryCodeV2 phone company } }\\n      lastOrder { processedAt }\\n      orders(first: 1, sortKey: PROCESSED_AT) { nodes { processedAt } }\\n      companyContactProfiles { id legacyResourceId title company { id legacyResourceId name } }\\n      metafields(first: 100) { nodes { id legacyResourceId namespace key type value jsonValue createdAt updatedAt } }\\n    }\\n  }\\n}\", variables: { after: $json.after } }) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "shopify-graphql-complete-customers-page",
+      "name": "Shopify GraphQL - Complete Customers Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        260,
+        320
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "TOFvh8rHI1pD468B",
+          "name": "Flavour Blaster OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "merge-customer-state-and-shopify-response",
+      "name": "Merge Customer State and Shopify Response",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        510,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response=$json.data?.customers;\nif(!response?.pageInfo||!Array.isArray(response.nodes)) throw new Error('SHOPIFY_CUSTOMERS_RESPONSE_INVALID');\nconst numericId=gid=>Number(String(gid||'').split('/').pop())||null;\nconst region=c=>c==='US'?'us':c==='GB'?'gb':c==='AU'?'aus':['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE'].includes(c)?'eur':'other';\nconst now=new Date().toISOString(); const customers=[];\nfor(const c of response.nodes){const id=Number(c.legacyResourceId)||numericId(c.id);if(!Number.isSafeInteger(id))throw new Error('SHOPIFY_CUSTOMER_ID_INVALID');const country=c.defaultAddress?.countryCodeV2||null;\ncustomers.push({shopify_customer_id:id,display_name:c.displayName||'Customer',first_name:c.firstName||null,last_name:c.lastName||null,email:c.defaultEmailAddress?.emailAddress||null,phone:c.defaultPhoneNumber?.phoneNumber||null,locale:c.locale||null,state:String(c.state||'').toLowerCase()||null,note:c.note||null,tags:c.tags||[],verified_email:c.defaultEmailAddress?.validFormat??null,tax_exempt:c.taxExempt??null,tax_exemptions:c.taxExemptions||[],data_sale_opt_out:c.dataSaleOptOut??null,email_marketing_consent:c.defaultEmailAddress||{},sms_marketing_consent:c.defaultPhoneNumber||{},default_address:c.defaultAddress||{},addresses:c.addressesV2?.nodes||[],company_profiles:(c.companyContactProfiles||[]).map(x=>({id:x.legacyResourceId||numericId(x.id),title:x.title,company:{id:x.company?.legacyResourceId||numericId(x.company?.id),name:x.company?.name}})),metafields:(c.metafields?.nodes||[]).map(m=>({id:m.legacyResourceId||numericId(m.id),namespace:m.namespace,key:m.key,type:m.type,value:m.value,jsonValue:m.jsonValue,createdAt:m.createdAt,updatedAt:m.updatedAt})),default_country_code:country,region_code:region(country),first_order_at:c.orders?.nodes?.[0]?.processedAt||null,last_order_at:c.lastOrder?.processedAt||null,order_count:Number(c.numberOfOrders||0),amount_spent:Number(c.amountSpent?.amount||0),amount_spent_currency:c.amountSpent?.currencyCode||null,shopify_created_at:c.createdAt,shopify_updated_at:c.updatedAt,raw_record:c,last_seen_at:$json.runStartedAt,is_deleted:false,deleted_at:null,synced_at:now,updated_at:now});}\nreturn [{json:{runStartedAt:$json.runStartedAt,end:$json.end,after:$json.after,page:Number($json.page),maxPages:Number($json.maxPages),pagesRead:Number($json.pagesRead||0),customersRead:Number($json.customersRead||0),customers,pageInfo:response.pageInfo}}];"
+      },
+      "id": "normalize-complete-customers",
+      "name": "Normalize Complete Customers",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_customers?on_conflict=shopify_customer_id",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=minimal"
+            },
+            {
+              "name": "User-Agent",
+              "value": "FlavourBlasterDashboard-n8n/1.0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($('Normalize Complete Customers').item.json.customers) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "supabase-upsert-complete-customers-credential-required-",
+      "name": "Supabase Upsert Complete Customers [CREDENTIAL REQUIRED]",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1010,
+        320
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const b=$('Normalize Complete Customers').item.json;const pagesRead=b.pagesRead+1;const more=Boolean(b.pageInfo?.hasNextPage);if(more&&pagesRead>=b.maxPages)throw new Error('SHOPIFY_CUSTOMERS_PAGE_LIMIT_REACHED:'+b.maxPages);if(more&&!b.pageInfo?.endCursor)throw new Error('SHOPIFY_CUSTOMERS_CURSOR_MISSING');return [{json:{runStartedAt:b.runStartedAt,end:b.end,after:more?b.pageInfo.endCursor:null,page:b.page+1,maxPages:b.maxPages,pagesRead,customersRead:b.customersRead+b.customers.length,continue:more}}];"
+      },
+      "id": "advance-customer-cursor-after-successful-writes",
+      "name": "Advance Customer Cursor After Successful Writes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "customer-more",
+              "leftValue": "={{ $json.continue }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "more-customer-pages-",
+      "name": "More Customer Pages?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        510,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 1,
+        "unit": "seconds"
+      },
+      "id": "customer-rate-limit-pause-1-second",
+      "name": "Customer Rate Limit Pause - 1 Second",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        760,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{json:{runStartedAt:$json.runStartedAt,end:$json.end,customerPagesRead:$json.pagesRead,customersRead:$json.customersRead,after:null,page:1,maxPages:100,pagesRead:0,companiesRead:0,locationsRead:0,contactsRead:0}}];"
+      },
+      "id": "initialize-company-directory-sync",
+      "name": "Initialize Company Directory Sync",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1010,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://jetchill-mixology.myshopify.com/admin/api/2026-07/graphql.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ query: \"query DashboardCompanies($after: String) {\\n  companies(first: 100, after: $after, sortKey: ID) {\\n    pageInfo { hasNextPage endCursor }\\n    nodes {\\n      id name externalId note customerSince createdAt updatedAt\\n      contactsCount { count } locationsCount { count } ordersCount { count } totalSpent { amount currencyCode }\\n      mainContact { id isMainContact title locale createdAt updatedAt customer { id legacyResourceId displayName } }\\n      metafields(first: 100) { nodes { id legacyResourceId namespace key type value jsonValue createdAt updatedAt } }\\n      contacts(first: 100) { nodes { id isMainContact title locale createdAt updatedAt customer { id legacyResourceId displayName } roleAssignments(first: 100) { nodes { role { id name } companyLocation { id legacyResourceId name } } } } }\\n      locations(first: 100) { nodes {\\n        id name externalId phone locale note currency createdAt updatedAt\\n        billingAddress { address1 address2 city province provinceCode zip country countryCode phone recipient }\\n        shippingAddress { address1 address2 city province provinceCode zip country countryCode phone recipient }\\n        taxSettings { taxExempt taxExemptions taxRegistrationId }\\n        buyerExperienceConfiguration { checkoutToDraft editableShippingAddress paymentTermsTemplate { id name description paymentTermsType } }\\n        catalogs(first: 100) { nodes { id title status } }\\n        metafields(first: 100) { nodes { id legacyResourceId namespace key type value jsonValue createdAt updatedAt } }\\n        ordersCount { count } totalSpent { amount currencyCode }\\n        orders(first: 1, reverse: true, sortKey: PROCESSED_AT) { nodes { processedAt } }\\n      } }\\n    }\\n  }\\n}\", variables: { after: $json.after } }) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "shopify-graphql-complete-companies-page",
+      "name": "Shopify GraphQL - Complete Companies Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        260,
+        640
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "TOFvh8rHI1pD468B",
+          "name": "Flavour Blaster OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "merge-company-state-and-shopify-response",
+      "name": "Merge Company State and Shopify Response",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        510,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response=$json.data?.companies;if(!response?.pageInfo||!Array.isArray(response.nodes))throw new Error('SHOPIFY_COMPANIES_RESPONSE_INVALID');\nconst id=x=>Number(String(x||'').split('/').pop())||null;const now=new Date().toISOString();const companies=[],locations=[],contacts=[];\nfor(const c of response.nodes){const companyId=id(c.id);if(!Number.isSafeInteger(companyId))throw new Error('SHOPIFY_COMPANY_ID_INVALID');const main=c.mainContact?.customer;\ncompanies.push({shopify_company_id:companyId,name:c.name,external_id:c.externalId||null,note:c.note||null,customer_since:c.customerSince||null,main_contact_id:id(c.mainContact?.id),main_contact_name:main?.displayName||null,contacts_count:Number(c.contactsCount?.count||0),locations_count:Number(c.locationsCount?.count||0),order_count:Number(c.ordersCount?.count||0),total_spent:Number(c.totalSpent?.amount||0),currency_code:c.totalSpent?.currencyCode||null,metafields:c.metafields?.nodes||[],raw_record:c,shopify_created_at:c.createdAt,shopify_updated_at:c.updatedAt,last_seen_at:$json.runStartedAt,is_deleted:false,deleted_at:null,synced_at:now,updated_at:now});\nfor(const l of c.locations?.nodes||[]){const locationId=id(l.id);if(!Number.isSafeInteger(locationId))throw new Error('SHOPIFY_COMPANY_LOCATION_ID_INVALID');locations.push({shopify_company_location_id:locationId,shopify_company_id:companyId,name:l.name,external_id:l.externalId||null,phone:l.phone||null,locale:l.locale||null,note:l.note||null,currency_code:l.currency||l.totalSpent?.currencyCode||null,billing_address:l.billingAddress||{},shipping_address:l.shippingAddress||{},tax_settings:l.taxSettings||{},buyer_experience_configuration:l.buyerExperienceConfiguration||{},catalogs:l.catalogs?.nodes||[],metafields:l.metafields?.nodes||[],order_count:Number(l.ordersCount?.count||0),total_spent:Number(l.totalSpent?.amount||0),last_order_at:l.orders?.nodes?.[0]?.processedAt||null,raw_record:l,shopify_created_at:l.createdAt,shopify_updated_at:l.updatedAt,last_seen_at:$json.runStartedAt,is_deleted:false,deleted_at:null,synced_at:now,updated_at:now});}\nfor(const p of c.contacts?.nodes||[]){const contactId=id(p.id);if(!Number.isSafeInteger(contactId))throw new Error('SHOPIFY_COMPANY_CONTACT_ID_INVALID');contacts.push({shopify_company_contact_id:contactId,shopify_company_id:companyId,shopify_customer_id:Number(p.customer?.legacyResourceId)||id(p.customer?.id),display_name:p.customer?.displayName||'Contact',title:p.title||null,locale:p.locale||null,is_main_contact:Boolean(p.isMainContact),role_assignments:(p.roleAssignments?.nodes||[]).map(r=>({role:{id:id(r.role?.id),name:r.role?.name},location:{id:Number(r.companyLocation?.legacyResourceId)||id(r.companyLocation?.id),name:r.companyLocation?.name}})),raw_record:p,shopify_created_at:p.createdAt,shopify_updated_at:p.updatedAt,last_seen_at:$json.runStartedAt,is_deleted:false,deleted_at:null,synced_at:now,updated_at:now});}}\nreturn [{json:{runStartedAt:$json.runStartedAt,end:$json.end,customerPagesRead:$json.customerPagesRead,customersRead:$json.customersRead,after:$json.after,page:Number($json.page),maxPages:Number($json.maxPages),pagesRead:Number($json.pagesRead||0),companiesRead:Number($json.companiesRead||0),locationsRead:Number($json.locationsRead||0),contactsRead:Number($json.contactsRead||0),companies,locations,contacts,pageInfo:response.pageInfo}}];"
+      },
+      "id": "normalize-complete-companies-locations-contacts",
+      "name": "Normalize Complete Companies Locations Contacts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_companies?on_conflict=shopify_company_id",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=minimal"
+            },
+            {
+              "name": "User-Agent",
+              "value": "FlavourBlasterDashboard-n8n/1.0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($('Normalize Complete Companies Locations Contacts').item.json.companies) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "supabase-upsert-companies-credential-required-",
+      "name": "Supabase Upsert Companies [CREDENTIAL REQUIRED]",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1010,
+        640
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_company_locations?on_conflict=shopify_company_location_id",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=minimal"
+            },
+            {
+              "name": "User-Agent",
+              "value": "FlavourBlasterDashboard-n8n/1.0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($('Normalize Complete Companies Locations Contacts').item.json.locations) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "supabase-upsert-company-locations-credential-required-",
+      "name": "Supabase Upsert Company Locations [CREDENTIAL REQUIRED]",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        260,
+        800
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_company_contacts?on_conflict=shopify_company_contact_id",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=minimal"
+            },
+            {
+              "name": "User-Agent",
+              "value": "FlavourBlasterDashboard-n8n/1.0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($('Normalize Complete Companies Locations Contacts').item.json.contacts) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "supabase-upsert-company-contacts-credential-required-",
+      "name": "Supabase Upsert Company Contacts [CREDENTIAL REQUIRED]",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        510,
+        800
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const b=$('Normalize Complete Companies Locations Contacts').item.json;const pagesRead=b.pagesRead+1;const more=Boolean(b.pageInfo?.hasNextPage);if(more&&pagesRead>=b.maxPages)throw new Error('SHOPIFY_COMPANIES_PAGE_LIMIT_REACHED:'+b.maxPages);if(more&&!b.pageInfo?.endCursor)throw new Error('SHOPIFY_COMPANIES_CURSOR_MISSING');return [{json:{runStartedAt:b.runStartedAt,end:b.end,customerPagesRead:b.customerPagesRead,customersRead:b.customersRead,after:more?b.pageInfo.endCursor:null,page:b.page+1,maxPages:b.maxPages,pagesRead,companiesRead:b.companiesRead+b.companies.length,locationsRead:b.locationsRead+b.locations.length,contactsRead:b.contactsRead+b.contacts.length,continue:more}}];"
+      },
+      "id": "advance-company-cursor-after-successful-writes",
+      "name": "Advance Company Cursor After Successful Writes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "company-more",
+              "leftValue": "={{ $json.continue }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "more-company-pages-",
+      "name": "More Company Pages?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1010,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 1,
+        "unit": "seconds"
+      },
+      "id": "company-rate-limit-pause-1-second",
+      "name": "Company Rate Limit Pause - 1 Second",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        260,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/rpc/fb_finalize_customer_company_sync",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ p_sync_started_at: $json.runStartedAt }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "finalize-customer-company-soft-deletions-credential-required-",
+      "name": "Finalize Customer Company Soft Deletions [CREDENTIAL REQUIRED]",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        510,
+        960
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_sync_state?on_conflict=source_key",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=minimal"
+            },
+            {
+              "name": "User-Agent",
+              "value": "FlavourBlasterDashboard-n8n/1.0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ source_key:'shopify_customer_company_directory', last_success_at:new Date().toISOString(), metadata:{ customer_pages_read:$('Advance Company Cursor After Successful Writes').item.json.customerPagesRead, customers_read:$('Advance Company Cursor After Successful Writes').item.json.customersRead, company_pages_read:$('Advance Company Cursor After Successful Writes').item.json.pagesRead, companies_read:$('Advance Company Cursor After Successful Writes').item.json.companiesRead, locations_read:$('Advance Company Cursor After Successful Writes').item.json.locationsRead, contacts_read:$('Advance Company Cursor After Successful Writes').item.json.contactsRead, timezone:'Europe/London', max_pages:100 } }) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "supabase-upsert-success-checkpoint-credential-required-",
+      "name": "Supabase Upsert Success Checkpoint [CREDENTIAL REQUIRED]",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        960
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule - Every 6 Hours (London)": {
+      "main": [
+        [
+          {
+            "node": "Closed Development Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Closed Development Gate": {
+      "main": [
+        [
+          {
+            "node": "Initialize Customer Directory Sync",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Initialize Customer Directory Sync": {
+      "main": [
+        [
+          {
+            "node": "Shopify GraphQL - Complete Customers Page",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Customer State and Shopify Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shopify GraphQL - Complete Customers Page": {
+      "main": [
+        [
+          {
+            "node": "Merge Customer State and Shopify Response",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Customer State and Shopify Response": {
+      "main": [
+        [
+          {
+            "node": "Normalize Complete Customers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Complete Customers": {
+      "main": [
+        [
+          {
+            "node": "Supabase Upsert Complete Customers [CREDENTIAL REQUIRED]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Upsert Complete Customers [CREDENTIAL REQUIRED]": {
+      "main": [
+        [
+          {
+            "node": "Advance Customer Cursor After Successful Writes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Advance Customer Cursor After Successful Writes": {
+      "main": [
+        [
+          {
+            "node": "More Customer Pages?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "More Customer Pages?": {
+      "main": [
+        [
+          {
+            "node": "Customer Rate Limit Pause - 1 Second",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Initialize Company Directory Sync",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Customer Rate Limit Pause - 1 Second": {
+      "main": [
+        [
+          {
+            "node": "Shopify GraphQL - Complete Customers Page",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Customer State and Shopify Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Initialize Company Directory Sync": {
+      "main": [
+        [
+          {
+            "node": "Shopify GraphQL - Complete Companies Page",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Company State and Shopify Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shopify GraphQL - Complete Companies Page": {
+      "main": [
+        [
+          {
+            "node": "Merge Company State and Shopify Response",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Company State and Shopify Response": {
+      "main": [
+        [
+          {
+            "node": "Normalize Complete Companies Locations Contacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Complete Companies Locations Contacts": {
+      "main": [
+        [
+          {
+            "node": "Supabase Upsert Companies [CREDENTIAL REQUIRED]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Upsert Companies [CREDENTIAL REQUIRED]": {
+      "main": [
+        [
+          {
+            "node": "Supabase Upsert Company Locations [CREDENTIAL REQUIRED]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Upsert Company Locations [CREDENTIAL REQUIRED]": {
+      "main": [
+        [
+          {
+            "node": "Supabase Upsert Company Contacts [CREDENTIAL REQUIRED]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Upsert Company Contacts [CREDENTIAL REQUIRED]": {
+      "main": [
+        [
+          {
+            "node": "Advance Company Cursor After Successful Writes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Advance Company Cursor After Successful Writes": {
+      "main": [
+        [
+          {
+            "node": "More Company Pages?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "More Company Pages?": {
+      "main": [
+        [
+          {
+            "node": "Company Rate Limit Pause - 1 Second",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Finalize Customer Company Soft Deletions [CREDENTIAL REQUIRED]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Company Rate Limit Pause - 1 Second": {
+      "main": [
+        [
+          {
+            "node": "Shopify GraphQL - Complete Companies Page",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Company State and Shopify Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finalize Customer Company Soft Deletions [CREDENTIAL REQUIRED]": {
+      "main": [
+        [
+          {
+            "node": "Supabase Upsert Success Checkpoint [CREDENTIAL REQUIRED]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/London",
+    "saveManualExecutions": true
+  },
+  "versionId": "fb-customer-company-directory-disabled-v1",
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "developmentGate": "closed",
+    "targetFolderId": "BafBm52YFWfYw7sU",
+    "shopDomain": "jetchill-mixology.myshopify.com",
+    "shopifyApiVersion": "2026-07",
+    "timezone": "Europe/London",
+    "schedule": "Every 6 hours",
+    "scopeRequired": "read_customers or read_companies",
+    "privacy": "Full protected records remain in server-only Supabase tables; dashboard RPC returns a safe subset."
+  },
+  "tags": []
+}

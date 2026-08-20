@@ -10,12 +10,18 @@ Claude Design export with a server-only live-data bridge for the Flavour Blaster
 
 ## Data path
 
-1. Disabled n8n development workflows contain bounded Shopify fetches, closed safety gates, and a 50-page safety design. Cursor looping and success-only cursor advancement must be completed and verified before either write workflow can be tested or activated.
+1. n8n synchronizes Shopify orders and the complete product catalog into Supabase. The customer/company directory workflow is stored disabled with a closed development gate; it follows the product workflow's six-hour Europe/London schedule, bounded pagination, retries, success-only cursor advancement, and soft-deletion finalization.
 2. n8n upserts normalized rows into the `fb_*` Supabase tables.
-3. The server-only `fb_dashboard_snapshot` function returns aggregates to the Vercel API.
-4. The dashboard loads those aggregates and visibly reports live, stale, empty, or unavailable state.
+3. Server-only database functions return sales aggregates, the product catalog, and a privacy-safe customer/company directory to the Vercel API.
+4. The dashboard loads those payloads and visibly reports live, stale, empty, or unavailable state. Protected customer fields remain server-side; email addresses, phone numbers, notes, full postal addresses, and raw Shopify records are not returned to the unauthenticated browser.
 
 Google Sheets is an audit/output destination only; it is not a dashboard runtime dependency.
+
+## Customer and B2B directory
+
+The Customers view contains separate Customers, Companies, and Locations tabs with selectable columns, sortable desktop tables, expandable details, and condensed mobile cards. The default columns are deliberately concise while Supabase retains the complete approved dataset.
+
+The disabled n8n workflow requires a Shopify Admin API connection with customer and B2B company access, plus the existing Supabase service connection. It must remain disabled until a bounded first-run plan and activation are separately approved.
 
 ## Required server environment
 
