@@ -20,4 +20,4 @@ Then open:
 
 ## Deployment
 
-The project is configured as a static Vercel site. Requests to `/` are rewritten to the v2 dashboard source.
+The project is configured as a static Vercel site. The root entry point opens the v2 dashboard source, and `vercel.json` also defines the equivalent root rewrite.
