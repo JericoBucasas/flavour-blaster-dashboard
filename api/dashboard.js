@@ -55,8 +55,27 @@ module.exports = async function dashboard(req, res) {
       || !Array.isArray(customerDirectory.companies) || !Array.isArray(customerDirectory.locations)) {
       return res.status(502).json({ status: 'error', code: 'CUSTOMER_DIRECTORY_INVALID' });
     }
+    // Keep the complete directory in Supabase, but do not push tens of thousands of
+    // records into one browser render. The summary retains the complete counts while
+    // the dashboard receives a representative, usable first page for each directory.
+    const directoryPageSize = 500;
+    const boundedCustomerDirectory = {
+      ...customerDirectory,
+      customers: customerDirectory.customers.slice(0, directoryPageSize),
+      companies: customerDirectory.companies.slice(0, directoryPageSize),
+      locations: customerDirectory.locations.slice(0, directoryPageSize),
+      pageInfo: {
+        pageSize: directoryPageSize,
+        customersReturned: Math.min(customerDirectory.customers.length, directoryPageSize),
+        companiesReturned: Math.min(customerDirectory.companies.length, directoryPageSize),
+        locationsReturned: Math.min(customerDirectory.locations.length, directoryPageSize),
+        customersTotal: Number(customerDirectory.summary && customerDirectory.summary.customers) || customerDirectory.customers.length,
+        companiesTotal: Number(customerDirectory.summary && customerDirectory.summary.companies) || customerDirectory.companies.length,
+        locationsTotal: Number(customerDirectory.summary && customerDirectory.summary.locations) || customerDirectory.locations.length,
+      },
+    };
     res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
-    return res.status(200).json({ status: 'live', data:{ ...data, productCatalog, customerDirectory } });
+    return res.status(200).json({ status: 'live', data:{ ...data, productCatalog, customerDirectory: boundedCustomerDirectory } });
   } catch (_error) {
     return res.status(502).json({ status: 'error', code: 'DATASTORE_UNREACHABLE' });
   }
