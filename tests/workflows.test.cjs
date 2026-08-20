@@ -62,7 +62,21 @@ test('data workflows enforce bounded cursor pagination, retries, throttling and 
     const checkpointParents = Object.entries(workflow.connections)
       .filter(([, outputs]) => JSON.stringify(outputs).includes(checkpoint.name))
       .map(([name]) => name);
-    assert.deepEqual(checkpointParents, [file.includes('orders') ? 'More Orders Pages?' : 'More Product Pages?'], file);
+    assert.deepEqual(
+      checkpointParents,
+      [file.includes('orders') ? 'More Orders Pages?' : 'Finalize Soft Deletions [CREDENTIAL REQUIRED]'],
+      file,
+    );
+
+    if (file.includes('products')) {
+      const finalizer = workflow.nodes.find((node) => node.name === 'Finalize Soft Deletions [CREDENTIAL REQUIRED]');
+      assert.ok(finalizer, file);
+      assert.match(finalizer.parameters.url, /fb_finalize_product_catalog_sync/);
+      const finalizerParents = Object.entries(workflow.connections)
+        .filter(([, outputs]) => JSON.stringify(outputs).includes(finalizer.name))
+        .map(([name]) => name);
+      assert.deepEqual(finalizerParents, ['More Product Pages?'], file);
+    }
   }
 });
 
