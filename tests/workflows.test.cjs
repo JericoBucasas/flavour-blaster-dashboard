@@ -39,3 +39,37 @@ test('orders query uses Shopify shop currency and does not request customer emai
   assert.match(normalize, /currentTotalPriceSet\?\.shopMoney\?\.currencyCode/);
   assert.match(normalize, /email: null/);
 });
+
+test('data workflows enforce bounded cursor pagination, retries, throttling and success-only checkpoints', () => {
+  for (const file of files.filter((name) => !name.includes('health'))) {
+    const workflow = JSON.parse(fs.readFileSync(path.join(workflowDir, file), 'utf8'));
+    const shopify = workflow.nodes.find((node) => node.name.startsWith('Shopify GraphQL'));
+    const advance = workflow.nodes.find((node) => node.name === 'Advance Cursor After Successful Writes');
+    const pause = workflow.nodes.find((node) => node.name === 'Rate Limit Pause - 1 Second');
+    const checkpoint = workflow.nodes.find((node) => node.name.startsWith('Supabase Upsert Success Checkpoint'));
+    assert.ok(shopify, file);
+    assert.equal(shopify.retryOnFail, true, file);
+    assert.equal(shopify.maxTries, 3, file);
+    assert.ok(advance, file);
+    assert.match(advance.parameters.jsCode, /PAGE_LIMIT_REACHED/);
+    assert.match(advance.parameters.jsCode, /endCursor/);
+    assert.ok(pause, file);
+    assert.equal(pause.parameters.amount, 1, file);
+    assert.ok(checkpoint, file);
+    assert.match(checkpoint.parameters.body, /last_success_at/);
+    assert.equal(checkpoint.credentials.httpHeaderAuth.id, 'FB_SUPABASE_SECRET_REQUIRED', file);
+
+    const checkpointParents = Object.entries(workflow.connections)
+      .filter(([, outputs]) => JSON.stringify(outputs).includes(checkpoint.name))
+      .map(([name]) => name);
+    assert.deepEqual(checkpointParents, [file.includes('orders') ? 'More Orders Pages?' : 'More Product Pages?'], file);
+  }
+});
+
+test('health workflow queries only columns present in the approved sync-state schema', () => {
+  const workflow = JSON.parse(fs.readFileSync(path.join(workflowDir, 'fb-dashboard-sync-health.disabled.json'), 'utf8'));
+  const read = workflow.nodes.find((node) => node.name.startsWith('Read Supabase Sync State'));
+  assert.match(read.parameters.url, /source_key/);
+  assert.match(read.parameters.url, /last_success_at/);
+  assert.doesNotMatch(read.parameters.url, /workflow_key|last_attempt_at|last_error/);
+});

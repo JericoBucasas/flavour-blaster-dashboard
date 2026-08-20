@@ -2,7 +2,7 @@
   "name": "FB Dashboard | Sync Health Monitor [DISABLED]",
   "nodes": [
     {
-      "parameters": { "content": "## READ-ONLY DEVELOPMENT MONITOR\nIntentionally inactive and missing the Supabase credential. When later approved, this reads `fb_sync_state` only and fails if a successful sync is more than two hours old. No email, Sheet, Slack, or Teams output is connected.", "height": 220, "width": 470, "color": 5 },
+      "parameters": { "content": "## READ-ONLY SYNC MONITOR\nInactive template with a closed code gate. It reads only the approved `fb_sync_state` columns. Orders must have a successful checkpoint within two hours; the daily product catalog must have one within 26 hours. No email, Sheet, Slack, Teams or other external output is connected.", "height": 240, "width": 500, "color": 5 },
       "id": "health-note", "name": "Read Before Testing", "type": "n8n-nodes-base.stickyNote", "typeVersion": 1, "position": [-620, -220]
     },
     {
@@ -14,12 +14,13 @@
       "id": "health-gate", "name": "Closed Development Gate", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [-340, 100]
     },
     {
-      "parameters": { "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_sync_state?select=workflow_key,last_success_at,last_attempt_at,last_error,cursor_updated_at&order=workflow_key.asc", "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Accept", "value": "application/json" }] }, "options": {} },
+      "parameters": { "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_sync_state?source_key=in.(shopify_orders,shopify_products)&select=source_key,cursor_updated_at,last_success_at,metadata,updated_at&order=source_key.asc", "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Accept", "value": "application/json" }] }, "options": { "timeout": 30000 } },
       "id": "health-read", "name": "Read Supabase Sync State [CREDENTIAL REQUIRED]", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [-80, 100],
+      "retryOnFail": true, "maxTries": 3, "waitBetweenTries": 2000,
       "credentials": { "httpHeaderAuth": { "id": "FB_SUPABASE_SECRET_REQUIRED", "name": "Flavour Blaster Supabase Secret [REQUIRED]" } }
     },
     {
-      "parameters": { "jsCode": "const rows = Array.isArray($json) ? $json : [$json];\nconst now = Date.now(); const staleAfterMs = 2 * 60 * 60 * 1000;\nconst stale = rows.filter(r => !r.last_success_at || now - Date.parse(r.last_success_at) > staleAfterMs || r.last_error);\nif (stale.length) throw new Error(`SYNC_HEALTH_STALE: ${stale.map(r=>r.workflow_key).join(', ') || 'no successful sync state'}`);\nreturn [{ json: { status: 'healthy', checkedAt: new Date().toISOString(), workflows: rows.length } }];" },
+      "parameters": { "jsCode": "const rows = $input.all().map(i => i.json);\nconst byKey = new Map(rows.filter(r => r?.source_key).map(r => [r.source_key, r]));\nconst now = Date.now();\nconst required = [{ key: 'shopify_orders', maxAgeMs: 2 * 60 * 60 * 1000 }, { key: 'shopify_products', maxAgeMs: 26 * 60 * 60 * 1000 }];\nconst stale = required.filter(({ key, maxAgeMs }) => { const row = byKey.get(key); const when = row?.last_success_at ? Date.parse(row.last_success_at) : NaN; return !Number.isFinite(when) || now - when > maxAgeMs; }).map(x => x.key);\nif (stale.length) throw new Error(`SYNC_HEALTH_STALE:${stale.join(',')}`);\nreturn [{ json: { status: 'healthy', checkedAt: new Date().toISOString(), sources: required.map(x => ({ source_key: x.key, last_success_at: byKey.get(x.key).last_success_at })) } }];" },
       "id": "health-evaluate", "name": "Evaluate Two-Hour Freshness", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [180, 100]
     }
   ],

@@ -2,102 +2,96 @@
   "name": "FB Dashboard | Orders Incremental to Supabase [DISABLED]",
   "nodes": [
     {
-      "parameters": { "content": "## DEVELOPMENT SAFETY GATE\nThis workflow is intentionally inactive and the code gate below is set to false. Before any controlled test: create the server-only Supabase Header Auth credential named `Flavour Blaster Supabase Secret`, verify Shopify OAuth scopes, configure cursor pagination, replace the gate, and approve an explicit date window. Never run an unbounded historical sync.", "height": 260, "width": 520, "color": 5 },
-      "id": "orders-note",
-      "name": "Read Before Testing",
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [-900, -260]
+      "parameters": { "content": "## CONTROLLED RELEASE SAFETY\nInactive template with a closed code gate. The first approved run is limited to a rolling 7-day order window, 100 orders per page and 50 pages. Every Shopify and Supabase request retries up to three times. A one-second pause is applied between Shopify pages. The checkpoint advances only after every page has been written successfully. Never widen the window or page ceiling without a separate review.", "height": 300, "width": 560, "color": 5 },
+      "id": "orders-note", "name": "Read Before Testing", "type": "n8n-nodes-base.stickyNote", "typeVersion": 1, "position": [-1180, -300]
     },
     {
       "parameters": { "rule": { "interval": [{ "field": "hours", "hoursInterval": 1 }] } },
-      "id": "orders-schedule",
-      "name": "Schedule - Every Hour (Inactive)",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
-      "position": [-820, 120]
+      "id": "orders-schedule", "name": "Schedule - Every Hour (Inactive)", "type": "n8n-nodes-base.scheduleTrigger", "typeVersion": 1.2, "position": [-1120, 100]
     },
     {
       "parameters": { "jsCode": "const DEVELOPMENT_GATE = false;\nif (!DEVELOPMENT_GATE) throw new Error('DEVELOPMENT_GATE_CLOSED: approve a bounded test before changing this value');\nreturn $input.all();" },
-      "id": "orders-gate",
-      "name": "Closed Development Gate",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [-580, 120]
+      "id": "orders-gate", "name": "Closed Development Gate", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [-900, 100]
     },
     {
-      "parameters": { "jsCode": "const end = new Date();\nconst start = new Date(end.getTime() - 7 * 86400000);\nreturn [{ json: { start: start.toISOString(), end: end.toISOString(), after: null, page: 1, maxPages: 50 } }];" },
-      "id": "orders-window",
-      "name": "Build Bounded 7-Day Window",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [-340, 120]
+      "parameters": { "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_sync_state?source_key=eq.shopify_orders&select=source_key,cursor_updated_at,last_success_at,metadata", "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Accept", "value": "application/json" }] }, "options": { "timeout": 30000 } },
+      "id": "orders-read-checkpoint", "name": "Read Orders Checkpoint [CREDENTIAL REQUIRED]", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [-680, 100],
+      "retryOnFail": true, "maxTries": 3, "waitBetweenTries": 2000,
+      "credentials": { "httpHeaderAuth": { "id": "FB_SUPABASE_SECRET_REQUIRED", "name": "Flavour Blaster Supabase Secret [REQUIRED]" } }
+    },
+    {
+      "parameters": { "jsCode": "const rows = $input.all().map(i => i.json);\nconst checkpoint = rows.find(r => r && r.source_key === 'shopify_orders') || null;\nconst end = new Date();\nconst hardFloor = new Date(end.getTime() - 7 * 86400000);\nconst saved = checkpoint?.cursor_updated_at ? new Date(checkpoint.cursor_updated_at) : null;\nconst overlap = saved && !Number.isNaN(saved.getTime()) ? new Date(saved.getTime() - 5 * 60000) : hardFloor;\nconst start = overlap > hardFloor ? overlap : hardFloor;\nreturn [{ json: { start: start.toISOString(), end: end.toISOString(), after: null, page: 1, maxPages: 50, pagesRead: 0, ordersRead: 0, linesRead: 0, customersRead: 0 } }];" },
+      "id": "orders-window", "name": "Build Bounded Incremental Window", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [-440, 100]
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://jetchill-mixology.myshopify.com/admin/api/2026-07/graphql.json",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "shopifyOAuth2Api",
-        "sendBody": true,
-        "contentType": "raw",
-        "rawContentType": "application/json",
+        "method": "POST", "url": "https://jetchill-mixology.myshopify.com/admin/api/2026-07/graphql.json", "authentication": "predefinedCredentialType", "nodeCredentialType": "shopifyOAuth2Api", "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
         "body": "={{ JSON.stringify({ query: `query DashboardOrders($query: String!, $after: String) { orders(first: 100, after: $after, sortKey: UPDATED_AT, query: $query) { pageInfo { hasNextPage endCursor } nodes { id legacyResourceId name createdAt processedAt updatedAt cancelledAt displayFinancialStatus displayFulfillmentStatus test tags currentSubtotalPriceSet { shopMoney { amount currencyCode } } currentTotalDiscountsSet { shopMoney { amount currencyCode } } currentTotalPriceSet { shopMoney { amount currencyCode } } currentTotalTaxSet { shopMoney { amount currencyCode } } totalRefundedSet { shopMoney { amount currencyCode } } customer { id legacyResourceId displayName numberOfOrders } billingAddress { countryCodeV2 } shippingAddress { countryCodeV2 } lineItems(first: 100) { nodes { id legacyResourceId name title variantTitle sku quantity currentQuantity originalTotalSet { shopMoney { amount currencyCode } } discountedTotalSet { shopMoney { amount currencyCode } } variant { id legacyResourceId product { id legacyResourceId } } } } } } }`, variables: { query: `updated_at:>=${$json.start} updated_at:<=${$json.end}`, after: $json.after } }) }}",
         "options": { "timeout": 120000 }
       },
-      "id": "orders-shopify",
-      "name": "Shopify GraphQL - Orders Page",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [-80, 120],
+      "id": "orders-shopify", "name": "Shopify GraphQL - Orders Page", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [-180, 20],
+      "retryOnFail": true, "maxTries": 3, "waitBetweenTries": 2000,
       "credentials": { "shopifyOAuth2Api": { "id": "TOFvh8rHI1pD468B", "name": "Flavour Blaster OAuth2" } }
     },
     {
-      "parameters": { "jsCode": "const response = $json.data?.orders;\nif (!response) throw new Error('SHOPIFY_ORDERS_RESPONSE_INVALID');\nconst countryRegion = c => c === 'US' ? 'us' : c === 'GB' ? 'gb' : c === 'AU' ? 'aus' : ['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE'].includes(c) ? 'eur' : 'other';\nconst numericId = gid => Number(String(gid || '').split('/').pop()) || null;\nconst orders = []; const lines = []; const customers = [];\nfor (const o of response.nodes || []) {\n  const channel = (o.tags || []).some(t => /wholesale|b2b/i.test(t)) ? 'shopify_b2b' : 'shopify_d2c';\n  const orderId = Number(o.legacyResourceId); const customerId = o.customer ? Number(o.customer.legacyResourceId) : null;\n  const subtotal = Number(o.currentSubtotalPriceSet?.shopMoney?.amount || 0); const total = Number(o.currentTotalPriceSet?.shopMoney?.amount || 0); const discounts = Number(o.currentTotalDiscountsSet?.shopMoney?.amount || 0); const refunds = Number(o.totalRefundedSet?.shopMoney?.amount || 0);\n  orders.push({ shopify_order_id: orderId, order_name: o.name, channel, processed_at: o.processedAt || o.createdAt, shopify_created_at: o.createdAt, shopify_updated_at: o.updatedAt, cancelled_at: o.cancelledAt, customer_id: customerId, customer_display_name: o.customer?.displayName || null, region_code: countryRegion(o.shippingAddress?.countryCodeV2 || o.billingAddress?.countryCodeV2), currency_code: o.currentTotalPriceSet?.shopMoney?.currencyCode || 'USD', financial_status: String(o.displayFinancialStatus || '').toLowerCase(), fulfillment_status: String(o.displayFulfillmentStatus || '').toLowerCase(), tags: o.tags || [], total_quantity: (o.lineItems?.nodes || []).reduce((s,l)=>s+Number(l.currentQuantity || 0),0), gross_sales: subtotal + discounts, discounts, refunds, net_sales: Math.max(0, subtotal - refunds), total_sales: total, tax_total: Number(o.currentTotalTaxSet?.shopMoney?.amount || 0), is_test: Boolean(o.test), raw: o });\n  for (const l of o.lineItems?.nodes || []) lines.push({ shopify_line_item_id: Number(l.legacyResourceId) || numericId(l.id), shopify_order_id: orderId, shopify_product_id: Number(l.variant?.product?.legacyResourceId) || numericId(l.variant?.product?.id), shopify_variant_id: Number(l.variant?.legacyResourceId) || numericId(l.variant?.id), title: l.title || l.name, variant_title: l.variantTitle, sku: l.sku, quantity: Number(l.quantity || 0), refunded_quantity: Math.max(0, Number(l.quantity || 0) - Number(l.currentQuantity || 0)), gross_sales: Number(l.originalTotalSet?.shopMoney?.amount || 0), discounts: Math.max(0, Number(l.originalTotalSet?.shopMoney?.amount || 0) - Number(l.discountedTotalSet?.shopMoney?.amount || 0)), refunds: 0, net_sales: Number(l.discountedTotalSet?.shopMoney?.amount || 0), raw: l });\n  if (o.customer) customers.push({ shopify_customer_id: customerId, display_name: o.customer.displayName || null, email: null, order_count: Number(o.customer.numberOfOrders || 0), region_code: countryRegion(o.shippingAddress?.countryCodeV2 || o.billingAddress?.countryCodeV2), last_order_at: o.processedAt || o.createdAt, raw: o.customer });\n}\nreturn [{ json: { orders, lines, customers, pageInfo: response.pageInfo, safety: { page: 1, maxPages: 50 } } }];" },
-      "id": "orders-normalize",
-      "name": "Normalize Orders, Lines and Customers",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [200, 120]
+      "parameters": { "mode": "combine", "combineBy": "combineByPosition", "options": {} },
+      "id": "orders-merge", "name": "Merge State and Shopify Response", "type": "n8n-nodes-base.merge", "typeVersion": 3.2, "position": [40, 100]
     },
     {
-      "parameters": { "method": "POST", "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_orders?on_conflict=shopify_order_id", "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Prefer", "value": "resolution=merge-duplicates,return=minimal" }] }, "sendBody": true, "contentType": "raw", "rawContentType": "application/json", "body": "={{ JSON.stringify($json.orders) }}", "options": {} },
-      "id": "orders-upsert",
-      "name": "Supabase Upsert Orders [CREDENTIAL REQUIRED]",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [500, 0],
+      "parameters": { "jsCode": "const response = $json.data?.orders;\nif (!response || !response.pageInfo || !Array.isArray(response.nodes)) throw new Error('SHOPIFY_ORDERS_RESPONSE_INVALID');\nconst countryRegion = c => c === 'US' ? 'us' : c === 'GB' ? 'gb' : c === 'AU' ? 'aus' : ['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE'].includes(c) ? 'eur' : 'other';\nconst numericId = gid => Number(String(gid || '').split('/').pop()) || null;\nconst orders = []; const lines = []; const customersById = new Map();\nfor (const o of response.nodes) {\n  const channel = (o.tags || []).some(t => /wholesale|b2b/i.test(t)) ? 'shopify_b2b' : 'shopify_d2c';\n  const orderId = Number(o.legacyResourceId); const customerId = o.customer ? Number(o.customer.legacyResourceId) : null;\n  if (!Number.isSafeInteger(orderId)) throw new Error('SHOPIFY_ORDER_ID_INVALID');\n  const subtotal = Number(o.currentSubtotalPriceSet?.shopMoney?.amount || 0); const total = Number(o.currentTotalPriceSet?.shopMoney?.amount || 0); const discounts = Number(o.currentTotalDiscountsSet?.shopMoney?.amount || 0); const refunds = Number(o.totalRefundedSet?.shopMoney?.amount || 0);\n  orders.push({ shopify_order_id: orderId, order_name: o.name, channel, processed_at: o.processedAt || o.createdAt, shopify_created_at: o.createdAt, shopify_updated_at: o.updatedAt, cancelled_at: o.cancelledAt, customer_id: customerId, customer_display_name: o.customer?.displayName || null, region_code: countryRegion(o.shippingAddress?.countryCodeV2 || o.billingAddress?.countryCodeV2), currency_code: o.currentTotalPriceSet?.shopMoney?.currencyCode || 'USD', financial_status: String(o.displayFinancialStatus || '').toLowerCase(), fulfillment_status: String(o.displayFulfillmentStatus || '').toLowerCase(), tags: o.tags || [], total_quantity: (o.lineItems?.nodes || []).reduce((s,l)=>s+Number(l.currentQuantity || 0),0), gross_sales: subtotal + discounts, discounts, refunds, net_sales: Math.max(0, subtotal - refunds), total_sales: total, tax_total: Number(o.currentTotalTaxSet?.shopMoney?.amount || 0), is_test: Boolean(o.test), raw: o });\n  for (const l of o.lineItems?.nodes || []) { const lineId = Number(l.legacyResourceId) || numericId(l.id); if (!Number.isSafeInteger(lineId)) throw new Error('SHOPIFY_LINE_ITEM_ID_INVALID'); lines.push({ shopify_line_item_id: lineId, shopify_order_id: orderId, shopify_product_id: Number(l.variant?.product?.legacyResourceId) || numericId(l.variant?.product?.id), shopify_variant_id: Number(l.variant?.legacyResourceId) || numericId(l.variant?.id), title: l.title || l.name, variant_title: l.variantTitle, sku: l.sku, quantity: Number(l.quantity || 0), refunded_quantity: Math.max(0, Number(l.quantity || 0) - Number(l.currentQuantity || 0)), gross_sales: Number(l.originalTotalSet?.shopMoney?.amount || 0), discounts: Math.max(0, Number(l.originalTotalSet?.shopMoney?.amount || 0) - Number(l.discountedTotalSet?.shopMoney?.amount || 0)), refunds: 0, net_sales: Number(l.discountedTotalSet?.shopMoney?.amount || 0), raw: l }); }\n  if (o.customer && Number.isSafeInteger(customerId)) customersById.set(customerId, { shopify_customer_id: customerId, display_name: o.customer.displayName || null, email: null, order_count: Number(o.customer.numberOfOrders || 0), region_code: countryRegion(o.shippingAddress?.countryCodeV2 || o.billingAddress?.countryCodeV2), last_order_at: o.processedAt || o.createdAt, raw: o.customer });\n}\nreturn [{ json: { start: $json.start, end: $json.end, after: $json.after, page: Number($json.page), maxPages: Number($json.maxPages), pagesRead: Number($json.pagesRead || 0), ordersRead: Number($json.ordersRead || 0), linesRead: Number($json.linesRead || 0), customersRead: Number($json.customersRead || 0), orders, lines, customers: [...customersById.values()], pageInfo: response.pageInfo } }];" },
+      "id": "orders-normalize", "name": "Normalize Orders, Lines and Customers", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [280, 100]
+    },
+    {
+      "parameters": { "method": "POST", "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_orders?on_conflict=shopify_order_id", "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Prefer", "value": "resolution=merge-duplicates,return=minimal" }] }, "sendBody": true, "contentType": "raw", "rawContentType": "application/json", "body": "={{ JSON.stringify($('Normalize Orders, Lines and Customers').item.json.orders) }}", "options": { "timeout": 120000 } },
+      "id": "orders-upsert", "name": "Supabase Upsert Orders [CREDENTIAL REQUIRED]", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [540, 100], "alwaysOutputData": true, "retryOnFail": true, "maxTries": 3, "waitBetweenTries": 2000,
       "credentials": { "httpHeaderAuth": { "id": "FB_SUPABASE_SECRET_REQUIRED", "name": "Flavour Blaster Supabase Secret [REQUIRED]" } }
     },
     {
-      "parameters": { "method": "POST", "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_order_lines?on_conflict=shopify_line_item_id", "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Prefer", "value": "resolution=merge-duplicates,return=minimal" }] }, "sendBody": true, "contentType": "raw", "rawContentType": "application/json", "body": "={{ JSON.stringify($json.lines) }}", "options": {} },
-      "id": "lines-upsert",
-      "name": "Supabase Upsert Order Lines [CREDENTIAL REQUIRED]",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [500, 120],
+      "parameters": { "method": "POST", "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_order_lines?on_conflict=shopify_line_item_id", "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Prefer", "value": "resolution=merge-duplicates,return=minimal" }] }, "sendBody": true, "contentType": "raw", "rawContentType": "application/json", "body": "={{ JSON.stringify($('Normalize Orders, Lines and Customers').item.json.lines) }}", "options": { "timeout": 120000 } },
+      "id": "lines-upsert", "name": "Supabase Upsert Order Lines [CREDENTIAL REQUIRED]", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [780, 100], "alwaysOutputData": true, "retryOnFail": true, "maxTries": 3, "waitBetweenTries": 2000,
       "credentials": { "httpHeaderAuth": { "id": "FB_SUPABASE_SECRET_REQUIRED", "name": "Flavour Blaster Supabase Secret [REQUIRED]" } }
     },
     {
-      "parameters": { "method": "POST", "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_customers?on_conflict=shopify_customer_id", "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Prefer", "value": "resolution=merge-duplicates,return=minimal" }] }, "sendBody": true, "contentType": "raw", "rawContentType": "application/json", "body": "={{ JSON.stringify($json.customers) }}", "options": {} },
-      "id": "customers-upsert",
-      "name": "Supabase Upsert Customers [CREDENTIAL REQUIRED]",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [500, 240],
+      "parameters": { "method": "POST", "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_customers?on_conflict=shopify_customer_id", "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Prefer", "value": "resolution=merge-duplicates,return=minimal" }] }, "sendBody": true, "contentType": "raw", "rawContentType": "application/json", "body": "={{ JSON.stringify($('Normalize Orders, Lines and Customers').item.json.customers) }}", "options": { "timeout": 120000 } },
+      "id": "customers-upsert", "name": "Supabase Upsert Customers [CREDENTIAL REQUIRED]", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [1020, 100], "alwaysOutputData": true, "retryOnFail": true, "maxTries": 3, "waitBetweenTries": 2000,
+      "credentials": { "httpHeaderAuth": { "id": "FB_SUPABASE_SECRET_REQUIRED", "name": "Flavour Blaster Supabase Secret [REQUIRED]" } }
+    },
+    {
+      "parameters": { "jsCode": "const b = $('Normalize Orders, Lines and Customers').item.json;\nconst pagesRead = b.pagesRead + 1;\nconst hasNextPage = Boolean(b.pageInfo?.hasNextPage);\nif (hasNextPage && pagesRead >= b.maxPages) throw new Error(`SHOPIFY_ORDERS_PAGE_LIMIT_REACHED:${b.maxPages}`);\nif (hasNextPage && !b.pageInfo?.endCursor) throw new Error('SHOPIFY_ORDERS_CURSOR_MISSING');\nreturn [{ json: { start: b.start, end: b.end, after: hasNextPage ? b.pageInfo.endCursor : null, page: b.page + 1, maxPages: b.maxPages, pagesRead, ordersRead: b.ordersRead + b.orders.length, linesRead: b.linesRead + b.lines.length, customersRead: b.customersRead + b.customers.length, continue: hasNextPage } }];" },
+      "id": "orders-advance", "name": "Advance Cursor After Successful Writes", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [1260, 100]
+    },
+    {
+      "parameters": { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 }, "conditions": [{ "id": "orders-has-next", "leftValue": "={{ $json.continue }}", "rightValue": true, "operator": { "type": "boolean", "operation": "true", "singleValue": true } }], "combinator": "and" }, "options": {} },
+      "id": "orders-if", "name": "More Orders Pages?", "type": "n8n-nodes-base.if", "typeVersion": 2.2, "position": [1480, 100]
+    },
+    {
+      "parameters": { "amount": 1 },
+      "id": "orders-wait", "name": "Rate Limit Pause - 1 Second", "type": "n8n-nodes-base.wait", "typeVersion": 1.1, "position": [1700, 20], "webhookId": "fb-orders-rate-limit-pause"
+    },
+    {
+      "parameters": { "method": "POST", "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_sync_state?on_conflict=source_key", "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Prefer", "value": "resolution=merge-duplicates,return=minimal" }] }, "sendBody": true, "contentType": "raw", "rawContentType": "application/json", "body": "={{ JSON.stringify({ source_key: 'shopify_orders', cursor_updated_at: $json.end, last_success_at: new Date().toISOString(), metadata: { window_start: $json.start, window_end: $json.end, pages_read: $json.pagesRead, orders_read: $json.ordersRead, lines_read: $json.linesRead, customers_read: $json.customersRead, bounded_days: 7, max_pages: $json.maxPages } }) }}", "options": { "timeout": 30000 } },
+      "id": "orders-checkpoint", "name": "Supabase Upsert Success Checkpoint [CREDENTIAL REQUIRED]", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [1700, 200], "alwaysOutputData": true, "retryOnFail": true, "maxTries": 3, "waitBetweenTries": 2000,
       "credentials": { "httpHeaderAuth": { "id": "FB_SUPABASE_SECRET_REQUIRED", "name": "Flavour Blaster Supabase Secret [REQUIRED]" } }
     }
   ],
   "connections": {
     "Schedule - Every Hour (Inactive)": { "main": [[{ "node": "Closed Development Gate", "type": "main", "index": 0 }]] },
-    "Closed Development Gate": { "main": [[{ "node": "Build Bounded 7-Day Window", "type": "main", "index": 0 }]] },
-    "Build Bounded 7-Day Window": { "main": [[{ "node": "Shopify GraphQL - Orders Page", "type": "main", "index": 0 }]] },
-    "Shopify GraphQL - Orders Page": { "main": [[{ "node": "Normalize Orders, Lines and Customers", "type": "main", "index": 0 }]] },
-    "Normalize Orders, Lines and Customers": { "main": [[{ "node": "Supabase Upsert Orders [CREDENTIAL REQUIRED]", "type": "main", "index": 0 }, { "node": "Supabase Upsert Order Lines [CREDENTIAL REQUIRED]", "type": "main", "index": 0 }, { "node": "Supabase Upsert Customers [CREDENTIAL REQUIRED]", "type": "main", "index": 0 }]] }
+    "Closed Development Gate": { "main": [[{ "node": "Read Orders Checkpoint [CREDENTIAL REQUIRED]", "type": "main", "index": 0 }]] },
+    "Read Orders Checkpoint [CREDENTIAL REQUIRED]": { "main": [[{ "node": "Build Bounded Incremental Window", "type": "main", "index": 0 }]] },
+    "Build Bounded Incremental Window": { "main": [[{ "node": "Shopify GraphQL - Orders Page", "type": "main", "index": 0 }, { "node": "Merge State and Shopify Response", "type": "main", "index": 0 }]] },
+    "Shopify GraphQL - Orders Page": { "main": [[{ "node": "Merge State and Shopify Response", "type": "main", "index": 1 }]] },
+    "Merge State and Shopify Response": { "main": [[{ "node": "Normalize Orders, Lines and Customers", "type": "main", "index": 0 }]] },
+    "Normalize Orders, Lines and Customers": { "main": [[{ "node": "Supabase Upsert Orders [CREDENTIAL REQUIRED]", "type": "main", "index": 0 }]] },
+    "Supabase Upsert Orders [CREDENTIAL REQUIRED]": { "main": [[{ "node": "Supabase Upsert Order Lines [CREDENTIAL REQUIRED]", "type": "main", "index": 0 }]] },
+    "Supabase Upsert Order Lines [CREDENTIAL REQUIRED]": { "main": [[{ "node": "Supabase Upsert Customers [CREDENTIAL REQUIRED]", "type": "main", "index": 0 }]] },
+    "Supabase Upsert Customers [CREDENTIAL REQUIRED]": { "main": [[{ "node": "Advance Cursor After Successful Writes", "type": "main", "index": 0 }]] },
+    "Advance Cursor After Successful Writes": { "main": [[{ "node": "More Orders Pages?", "type": "main", "index": 0 }]] },
+    "More Orders Pages?": { "main": [[{ "node": "Rate Limit Pause - 1 Second", "type": "main", "index": 0 }], [{ "node": "Supabase Upsert Success Checkpoint [CREDENTIAL REQUIRED]", "type": "main", "index": 0 }]] },
+    "Rate Limit Pause - 1 Second": { "main": [[{ "node": "Shopify GraphQL - Orders Page", "type": "main", "index": 0 }, { "node": "Merge State and Shopify Response", "type": "main", "index": 0 }]] }
   },
   "active": false,
-  "settings": { "executionOrder": "v1", "saveManualExecutions": true, "callerPolicy": "workflowsFromSameOwner" },
-  "versionId": "fb-dashboard-orders-development-v1",
+  "settings": { "executionOrder": "v1", "saveManualExecutions": true, "callerPolicy": "workflowsFromSameOwner", "executionTimeout": 900 },
+  "versionId": "fb-dashboard-orders-development-v2",
   "meta": { "templateCredsSetupCompleted": false },
   "tags": []
 }
