@@ -1,0 +1,50 @@
+{
+  "name": "FB Dashboard | Product Catalog to Supabase [DISABLED]",
+  "nodes": [
+    {
+      "parameters": { "content": "## DEVELOPMENT SAFETY GATE\nIntentionally inactive. The gate is closed and the Supabase credential is unresolved. Product pagination and a bounded, approved test must be verified before this workflow is allowed to write.", "height": 220, "width": 470, "color": 5 },
+      "id": "products-note", "name": "Read Before Testing", "type": "n8n-nodes-base.stickyNote", "typeVersion": 1, "position": [-760, -220]
+    },
+    {
+      "parameters": { "rule": { "interval": [{ "field": "days", "daysInterval": 1, "triggerAtHour": 3 }] } },
+      "id": "products-schedule", "name": "Schedule - Daily (Inactive)", "type": "n8n-nodes-base.scheduleTrigger", "typeVersion": 1.2, "position": [-720, 100]
+    },
+    {
+      "parameters": { "jsCode": "const DEVELOPMENT_GATE = false;\nif (!DEVELOPMENT_GATE) throw new Error('DEVELOPMENT_GATE_CLOSED: approve a bounded product test before changing this value');\nreturn [{ json: { after: null, page: 1, maxPages: 50 } }];" },
+      "id": "products-gate", "name": "Closed Development Gate", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [-480, 100]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://jetchill-mixology.myshopify.com/admin/api/2026-07/graphql.json", "authentication": "predefinedCredentialType", "nodeCredentialType": "shopifyOAuth2Api", "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ query: `query DashboardProducts($after: String) { products(first: 100, after: $after, sortKey: UPDATED_AT) { pageInfo { hasNextPage endCursor } nodes { id legacyResourceId title handle status vendor productType tags updatedAt featuredMedia { preview { image { url } } } variants(first: 100) { nodes { id legacyResourceId title sku barcode price compareAtPrice inventoryQuantity updatedAt image { url } } } } } }`, variables: { after: $json.after } }) }}", "options": { "timeout": 120000 }
+      },
+      "id": "products-shopify", "name": "Shopify GraphQL - Products Page", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [-220, 100],
+      "credentials": { "shopifyOAuth2Api": { "id": "TOFvh8rHI1pD468B", "name": "Flavour Blaster OAuth2" } }
+    },
+    {
+      "parameters": { "jsCode": "const response = $json.data?.products;\nif (!response) throw new Error('SHOPIFY_PRODUCTS_RESPONSE_INVALID');\nconst numericId = gid => Number(String(gid || '').split('/').pop()) || null;\nconst products = []; const variants = [];\nfor (const p of response.nodes || []) {\n  const productId = Number(p.legacyResourceId) || numericId(p.id);\n  products.push({ shopify_product_id: productId, title: p.title, handle: p.handle, status: String(p.status || '').toLowerCase(), vendor: p.vendor, product_type: p.productType, tags: p.tags || [], image_url: p.featuredMedia?.preview?.image?.url || null, shopify_updated_at: p.updatedAt, raw: p });\n  for (const v of p.variants?.nodes || []) variants.push({ shopify_variant_id: Number(v.legacyResourceId) || numericId(v.id), shopify_product_id: productId, title: v.title, sku: v.sku, barcode: v.barcode, price: Number(v.price || 0), compare_at_price: v.compareAtPrice == null ? null : Number(v.compareAtPrice), inventory_quantity: v.inventoryQuantity, image_url: v.image?.url || p.featuredMedia?.preview?.image?.url || null, shopify_updated_at: v.updatedAt, raw: v });\n}\nreturn [{ json: { products, variants, pageInfo: response.pageInfo, safety: { page: 1, maxPages: 50 } } }];" },
+      "id": "products-normalize", "name": "Normalize Products and Variants", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [40, 100]
+    },
+    {
+      "parameters": { "method": "POST", "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_products?on_conflict=shopify_product_id", "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Prefer", "value": "resolution=merge-duplicates,return=minimal" }] }, "sendBody": true, "contentType": "raw", "rawContentType": "application/json", "body": "={{ JSON.stringify($json.products) }}", "options": {} },
+      "id": "products-upsert", "name": "Supabase Upsert Products [CREDENTIAL REQUIRED]", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [340, 40],
+      "credentials": { "httpHeaderAuth": { "id": "FB_SUPABASE_SECRET_REQUIRED", "name": "Flavour Blaster Supabase Secret [REQUIRED]" } }
+    },
+    {
+      "parameters": { "method": "POST", "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_product_variants?on_conflict=shopify_variant_id", "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Prefer", "value": "resolution=merge-duplicates,return=minimal" }] }, "sendBody": true, "contentType": "raw", "rawContentType": "application/json", "body": "={{ JSON.stringify($json.variants) }}", "options": {} },
+      "id": "variants-upsert", "name": "Supabase Upsert Variants [CREDENTIAL REQUIRED]", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [340, 160],
+      "credentials": { "httpHeaderAuth": { "id": "FB_SUPABASE_SECRET_REQUIRED", "name": "Flavour Blaster Supabase Secret [REQUIRED]" } }
+    }
+  ],
+  "connections": {
+    "Schedule - Daily (Inactive)": { "main": [[{ "node": "Closed Development Gate", "type": "main", "index": 0 }]] },
+    "Closed Development Gate": { "main": [[{ "node": "Shopify GraphQL - Products Page", "type": "main", "index": 0 }]] },
+    "Shopify GraphQL - Products Page": { "main": [[{ "node": "Normalize Products and Variants", "type": "main", "index": 0 }]] },
+    "Normalize Products and Variants": { "main": [[{ "node": "Supabase Upsert Products [CREDENTIAL REQUIRED]", "type": "main", "index": 0 }, { "node": "Supabase Upsert Variants [CREDENTIAL REQUIRED]", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1", "saveManualExecutions": true, "callerPolicy": "workflowsFromSameOwner" },
+  "versionId": "fb-dashboard-products-development-v1",
+  "meta": { "templateCredsSetupCompleted": false },
+  "tags": []
+}

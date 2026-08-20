@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="./support.js"></script>
+<script src="./dashboard-live.js"></script>
 </head>
 <body>
 <x-dc>
@@ -413,7 +414,11 @@
       </div>
     </div>
 
-
+    <div style="display:flex;align-items:center;gap:8px;margin:0 0 14px;padding:9px 11px;border:1px solid {{ dataStatusBorder }};background:{{ dataStatusBg }};border-radius:9px;font-size:12.5px;line-height:1.35">
+      <i class="ph-duotone {{ dataStatusIcon }}" style="font-size:16px;color:{{ dataStatusColor }};flex:none"></i>
+      <span style="flex:1;min-width:0">{{ dataStatusLabel }}</span>
+      <sc-if value="{{ dataCanRetry }}" hint-placeholder-val="{{ false }}"><button type="button" class="btn btn-ghost" onClick="{{ retryLive }}" style="min-height:30px;padding:4px 8px">Retry</button></sc-if>
+    </div>
 
     <sc-if value="{{ isOverview }}" hint-placeholder-val="{{ true }}">
       <section id="sec-overview" data-screen-label="Overview">
@@ -724,7 +729,7 @@
             </tbody>
           </table>
         </div>
-        <div style="font-size:12.5px;opacity:0.55;margin-top:12px">Local amounts converted at {{ fxNote }}. Amazon UK settles in GBP; Shopify D2C bills EUR and AUD carts in local currency.</div>
+        <div style="font-size:12.5px;opacity:0.55;margin-top:12px">{{ regionDataNote }}</div>
       </div></section>
     </sc-if>
 
@@ -889,6 +894,8 @@
           </sc-for>
         </div><div style="display:contents">
         </div><div class="sd-card"><div class="sd-card-h">New vs returning customer orders</div>
+        <sc-if value="{{ customerHistoryUnavailable }}" hint-placeholder-val="{{ false }}"><div style="font-size:13.5px;line-height:1.55;opacity:0.7">Daily acquisition and returning-customer history is not available from the current Shopify dataset. No time series is being estimated.</div></sc-if>
+        <sc-if value="{{ customerHistoryAvailable }}" hint-placeholder-val="{{ true }}">
         <sc-for list="{{ chartCuL }}" as="chart" hint-placeholder-count="1">
         <div style="position:relative;margin-top:14px">
           <svg viewBox="-34 0 894 318" style="display:block;width:100%;height:auto" onMouseMove="{{ chart.move }}" onMouseLeave="{{ chart.leave }}">
@@ -911,6 +918,7 @@
           <sc-for list="{{ chart.legend }}" as="lg"><span style="display:inline-flex;align-items:center;gap:8px;font-size:13px;opacity:0.85"><span style="width:18px;height:0;border-top:2.5px {{ lg.ls }} {{ lg.col }}"></span>{{ lg.name }}</span></sc-for>
         </div>
         </sc-for>
+        </sc-if>
 
         </div><div class="sd-card"><div class="sd-card-h">Acquisition cohorts &middot; repeat behaviour</div>
         <div style="overflow-x:auto">
@@ -955,6 +963,10 @@
     <sc-if value="{{ isAds }}" hint-placeholder-val="{{ false }}">
       <section id="sec-ads" data-screen-label="Ads">
         <sc-if value="{{ continuous }}" hint-placeholder-val="{{ false }}"><h2 style="font-size:16px;font-weight:650;margin:32px 0 0">Ads</h2></sc-if>
+        <sc-if value="{{ adUnavailable }}" hint-placeholder-val="{{ false }}">
+          <div class="sd-card"><div class="sd-card-h">Advertising data unavailable</div><div style="font-size:13.5px;line-height:1.55;opacity:0.7">Google Ads and Meta Ads are not connected. No spend, attribution, ROAS, campaign, or conversion figures are being estimated.</div></div>
+        </sc-if>
+        <sc-if value="{{ adDataAvailable }}" hint-placeholder-val="{{ true }}">
         <div class="sd-card sd-grid2 sd-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:12px 26px">
           <sc-for list="{{ adKpis }}" as="k" hint-placeholder-count="6">
             <div style="min-width:0">
@@ -1037,6 +1049,7 @@
           </div>
           <div style="font-size:12.5px;opacity:0.55;margin-top:12px">Sample figures modelled from the period's sales. Connect Meta and Google Ads accounts to replace with live spend and attribution.</div>
         </div>
+        </sc-if>
       </section>
     </sc-if>
 
@@ -1245,7 +1258,7 @@
           <input id="lg-set-in" type="file" accept="application/json,.json" onChange="{{ importSettings }}" style="display:none">
           <button type="button" class="btn btn-ghost" onClick="{{ resetAll }}"><i class="ph-duotone ph-arrow-counter-clockwise" style="font-size:14px"></i>Reset all to defaults</button>
         </div>
-        <p style="font-size:13px;opacity:0.65;margin-top:30px;max-width:560px;line-height:1.55;text-wrap:pretty">Settings persist in this browser. The dashboard renders generated sample data until a live source is wired to it &mdash; the saved link marks where that connection will point.</p>
+        <p style="font-size:13px;opacity:0.65;margin-top:30px;max-width:560px;line-height:1.55;text-wrap:pretty">Settings persist in this browser. Live Shopify data is requested through the protected dashboard API. Deterministic sample data appears only when the live source is empty or unavailable and is always labelled as fallback data.</p>
       </div></section>
     </sc-if>
   </main>
@@ -1280,9 +1293,10 @@ class Component extends DCLogic {
       { k:'eur', n:'Europe',         c:'#493083', cur:'EUR' },
       { k:'gb',  n:'United Kingdom', c:'#201e1d', cur:'GBP' },
       { k:'aus', n:'Australia',      c:'#9b9797', cur:'AUD' },
+      { k:'other', n:'Other',        c:'#6b7f5e', cur:'USD' },
     ];
     this.FX = { USD:[1, '$'], GBP:[0.79, '\u00a3'], EUR:[0.92, '\u20ac'], AUD:[1.52, 'A$'] };
-    this.RW = { d2c:[.60,.15,.10,.15], b2b:[.78,.10,.06,.06], amzus:[.95,.01,.01,.03], amzuk:[.02,.30,.66,.02] };
+    this.RW = { d2c:[.60,.15,.10,.15,0], b2b:[.78,.10,.06,.06,0], amzus:[.95,.01,.01,.03,0], amzuk:[.02,.30,.66,.02,0] };
     this.AD0 = { d2c:.095, b2b:.012, amzus:.125, amzuk:.115 };
     this.FUL0 = { d2c:4.6, b2b:22, amzus:3.9, amzuk:4.1 };
     this.MF = [.92,.90,.97,1.0,1.02,1.05,.96,.99,1.03,1.10,1.38,1.52];
@@ -1381,7 +1395,8 @@ class Component extends DCLogic {
       accent:'custom',
       accentHex:(hp.ah && /^[0-9a-fA-F]{6}$/.test(hp.ah)) ? '#' + hp.ah : (ls.brandV === 2 && ls.accentHex ? ls.accentHex : '#c9377e'),
       hsv:null, accHexDraft:null, accPickOpen:false, searchQ:'', searchExp:false, selKpi:'gross', chartOn:{}, ordSort:null, prodSort:null,
-      brandName:ls.brandName || 'The Ledger', brandTag:ls.brandTag ?? 'Multi-channel sales \u00b7 USD', logoData:ls.logoData || null, growthO:ls.growthO ?? null, coverO:ls.coverO ?? null, retO:ls.retO ?? null, areaO:ls.areaO ?? null, dataMode:ls.dataMode || 'sample', dataUrl:ls.dataUrl || '',
+      brandName:ls.brandV >= 3 && ls.brandName ? ls.brandName : 'Flavour Blaster', brandTag:ls.brandV >= 3 && ls.brandTag ? ls.brandTag : 'The Art of Aroma, Perfected!', logoData:ls.brandV >= 3 && ls.logoData ? ls.logoData : './assets/flavour-blaster-b.jpeg', growthO:ls.growthO ?? null, coverO:ls.coverO ?? null, retO:ls.retO ?? null, areaO:ls.areaO ?? null, dataMode:'live', dataUrl:'/api/dashboard',
+      dataStatus:'loading', dataError:null, dataUpdatedAt:null, dataCoverageStart:null, dataCoverageEnd:null, dataBaseCurrency:null, livePayload:null,
       repCur:ls.repCur || 'USD', fxAuto:ls.fxAuto ?? true, fxFetched:null, targetMode:ls.targetMode || 'growth', targetAbs:ls.targetAbs ?? null, chCfg:ls.chCfg || {}, rgCfg:ls.rgCfg || {},
       flagsOn:ls.flagsOn || {}, agingDays:ls.agingDays || 2, anomSens:ls.anomSens || 'med', density:ls.density || 'comfortable', contentW:[1200,1400,1600,2000].includes(ls.contentW) ? ls.contentW : 1200,
       kpiOn:ls.kpiOn || {}, kpiOrder:ls.kpiOrder || null, defView:ls.defView || null, defRange:ls.defRange || null, defCmp:ls.defCmp || null,
@@ -1408,8 +1423,33 @@ class Component extends DCLogic {
       else if (e.key === 'c' || e.key === 'C') { const on = this.state.cmpMode !== 'none'; this.setState({ cmpMode:on ? 'none' : 'prev', compare:!on }); }
     };
     window.addEventListener('keydown', this._keys);
+    this.loadLiveData();
   }
   componentWillUnmount() { window.removeEventListener('keydown', this._keys); }
+  async loadLiveData() {
+    if (!window.FlavourBlasterLive) {
+      this.setState({ dataStatus:'error', dataError:'LIVE_LOADER_MISSING' });
+      return;
+    }
+    this.setState({ dataStatus:'loading', dataError:null });
+    try {
+      const end = new Date(this.NOW).toISOString().slice(0, 10);
+      const payload = await window.FlavourBlasterLive.load('/api/dashboard', '2025-01-01', end);
+      const normalized = window.FlavourBlasterLive.normalize(payload, this.CH, this.RG);
+      if (!normalized.hasLiveData) {
+        this.setState({ dataStatus:'empty', livePayload:payload, dataUpdatedAt:payload.sourceLastUpdatedAt || payload.generatedAt || null,
+          dataCoverageStart:payload.coverageStart || null, dataCoverageEnd:payload.coverageEnd || null });
+        return;
+      }
+      this.days = normalized.days;
+      const baseCurrency = payload.recentOrders?.find(order => order.currency_code)?.currency_code || 'USD';
+      this.setState({ dataStatus:'live', livePayload:payload, dataUpdatedAt:payload.sync?.last_success_at || payload.sourceLastUpdatedAt || payload.generatedAt || null,
+        dataCoverageStart:payload.coverageStart || null, dataCoverageEnd:payload.coverageEnd || null, dataBaseCurrency:baseCurrency,
+        chOn:{ ...this.state.chOn, d2c:true, b2b:true, amzus:false, amzuk:false } });
+    } catch (error) {
+      this.setState({ dataStatus:'error', dataError:error && error.message ? error.message : 'LIVE_DATA_UNAVAILABLE' });
+    }
+  }
   componentDidUpdate() {
     const st = this.state;
     this.applyTheme();
@@ -1429,7 +1469,7 @@ class Component extends DCLogic {
   }
   settingsJson() {
     const st = this.state;
-    return JSON.stringify({ brandV:2, brandName:st.brandName, brandTag:st.brandTag, logoData:st.logoData, theme:st.theme, accent:st.accent, accentHex:st.accentHex,
+    return JSON.stringify({ brandV:3, brandName:st.brandName, brandTag:st.brandTag, logoData:st.logoData, theme:st.theme, accent:st.accent, accentHex:st.accentHex,
       growthO:st.growthO, coverO:st.coverO, retO:st.retO, areaO:st.areaO, dataMode:st.dataMode, dataUrl:st.dataUrl,
       repCur:st.repCur, fxAuto:st.fxAuto, fxGBP:this.fxRates.GBP, fxEUR:this.fxRates.EUR, fxAUD:this.fxRates.AUD, fyStart:this.fyStart, weekStart:this.weekStart, tz:this.tz,
       targetMode:st.targetMode, targetAbs:st.targetAbs, chCfg:st.chCfg, rgCfg:st.rgCfg,
@@ -1598,7 +1638,7 @@ class Component extends DCLogic {
   }
   mkSeg(on) { return { bg:on ? 'var(--color-bg)' : 'transparent', wt:on ? '600' : '400', sh:on ? 'var(--shadow-sm)' : 'none' }; }
   fmtDate(t, yr) { const d = new Date(t); return this.MO[d.getUTCMonth()] + ' ' + d.getUTCDate() + (yr ? ', ' + d.getUTCFullYear() : ''); }
-  rc() { const c = (this.state && this.state.repCur) || 'USD'; const d = this.FX[c] || this.FX.USD; return { r:d[0], s:d[1] }; }
+  rc() { const c = (this.state && this.state.repCur) || 'USD'; const base = (this.state && this.state.dataBaseCurrency) || 'USD'; const d = this.FX[c] || this.FX.USD; const b = this.FX[base] || this.FX.USD; return { r:d[0] / b[0], s:d[1] }; }
   money(v) { const { r, s } = this.rc(); return s + Math.round(v * r).toLocaleString('en-US'); }
   money2(v) { const { r, s } = this.rc(); return s + (v * r).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 }); }
   fx(v, cur) { const [rate, sym] = this.FX[cur] || this.FX.USD; return sym + Math.round(v * rate).toLocaleString('en-US'); }
@@ -1779,21 +1819,29 @@ class Component extends DCLogic {
 
     const cAov = cur.o ? cur.s / cur.o : 0, pAov = prev.o ? prev.s / prev.o : 0;
     const cConv = cur.v ? cur.o / cur.v : 0, pConv = prev.v ? prev.o / prev.v : 0;
-    const cMar = cur.ns ? cur.gp / cur.ns : 0, pMar = prev.ns ? prev.gp / prev.ns : 0;
+    const liveProductMetrics = st.dataStatus === 'live' && Array.isArray(st.livePayload?.products) ? st.livePayload.products : [];
+    const liveProductNet = liveProductMetrics.reduce((sum, p) => sum + (+p.net_sales || 0), 0);
+    const liveProductProfit = liveProductMetrics.reduce((sum, p) => sum + (+p.gross_profit || 0), 0);
+    const liveProductUnits = liveProductMetrics.reduce((sum, p) => sum + (+p.units || 0), 0);
+    const liveProductRefunded = liveProductMetrics.reduce((sum, p) => sum + (+p.refunded_units || 0), 0);
+    const liveCostAvailable = liveProductMetrics.some(p => (+p.cogs || +p.gross_profit));
+    const cMar = st.dataStatus === 'live' ? (liveCostAvailable && liveProductNet ? liveProductProfit / liveProductNet : 0) : (cur.ns ? cur.gp / cur.ns : 0);
+    const pMar = st.dataStatus === 'live' ? cMar : (prev.ns ? prev.gp / prev.ns : 0);
     const cDisc = cur.s ? cur.dsc / cur.s : 0, pDisc = prev.s ? prev.dsc / prev.s : 0;
-    const cRet = cur.u ? cur.rfU / cur.u : 0, pRet = prev.u ? prev.rfU / prev.u : 0;
+    const cRet = st.dataStatus === 'live' ? (liveProductUnits ? liveProductRefunded / liveProductUnits : 0) : (cur.u ? cur.rfU / cur.u : 0);
+    const pRet = st.dataStatus === 'live' ? cRet : (prev.u ? prev.rfU / prev.u : 0);
     const A2 = 'var(--color-accent-2-500)';
     const kpisAll = [
       { k:'gross', label:'Gross sales', val:this.money(cur.s), ...this.delta(cur.s, prev.s), ...this.sparks(cur, prev, d => d.s) },
       { k:'net', label:'Net sales', val:this.money(cur.ns), ...this.delta(cur.ns, prev.ns), ...this.sparks(cur, prev, d => d.ns) },
       { k:'orders', label:'Orders', val:this.num(cur.o), ...this.delta(cur.o, prev.o), ...this.sparks(cur, prev, d => d.o) },
       { k:'aov', label:'Average order value', val:this.money2(cAov), ...this.delta(cAov, pAov), ...this.sparks(cur, prev, d => d.o ? d.s / d.o : 0, null, true) },
-      { k:'conv', label:'Conversion rate', val:this.pct(cConv, 2), ...this.delta(cConv, pConv), ...this.sparks(cur, prev, d => d.v ? d.o / d.v : 0, null, true) },
-      { k:'margin', label:'Gross margin', val:this.pct(cMar), ...this.delta(cMar, pMar), ...this.sparks(cur, prev, d => d.ns ? d.gp / d.ns : 0, null, true) },
+      st.dataStatus === 'live' ? { k:'conv', label:'Conversion rate', val:'—', delta:'Sessions not connected', dcol:'inherit', spark:'', spark2:'' } : { k:'conv', label:'Conversion rate', val:this.pct(cConv, 2), ...this.delta(cConv, pConv), ...this.sparks(cur, prev, d => d.v ? d.o / d.v : 0, null, true) },
+      st.dataStatus === 'live' && !liveCostAvailable ? { k:'margin', label:'Gross margin', val:'—', delta:'Product cost unavailable', dcol:'inherit', spark:'', spark2:'' } : { k:'margin', label:'Gross margin', val:this.pct(cMar), ...this.delta(cMar, pMar), ...this.sparks(cur, prev, d => d.ns ? d.gp / d.ns : 0, null, true) },
       { k:'disc', label:'Discount rate', val:this.pct(cDisc), ...this.delta(cDisc, pDisc, true), ...this.sparks(cur, prev, d => d.s ? d.dsc / d.s : 0, A2, true) },
       { k:'ret', label:'Return rate', val:this.pct(cRet), ...this.delta(cRet, pRet, true), ...this.sparks(cur, prev, d => d.u ? d.rfU / d.u : 0, A2, true) },
-      { k:'adspend', label:'Ad spend', val:this.money(cur.s * 0.108), ...this.delta(cur.s * 0.108, prev.s * 0.108, true), ...this.sparks(cur, prev, d => d.s * 0.108, A2) },
-      { k:'adroas', label:'MER (sales \u00f7 ad spend)', val:(cur.s > 0 ? (1 / 0.108).toFixed(1) : '0.0') + '\u00d7', delta:'View Ads for ROAS detail', dcol:'inherit', ...this.sparks(cur, prev, d => d.s) },
+      st.dataStatus === 'live' ? { k:'adspend', label:'Ad spend', val:'—', delta:'Ads accounts not connected', dcol:'inherit', spark:'', spark2:'' } : { k:'adspend', label:'Ad spend', val:this.money(cur.s * 0.108), ...this.delta(cur.s * 0.108, prev.s * 0.108, true), ...this.sparks(cur, prev, d => d.s * 0.108, A2) },
+      st.dataStatus === 'live' ? { k:'adroas', label:'MER (sales \u00f7 ad spend)', val:'—', delta:'Ads accounts not connected', dcol:'inherit', spark:'', spark2:'' } : { k:'adroas', label:'MER (sales \u00f7 ad spend)', val:(cur.s > 0 ? (1 / 0.108).toFixed(1) : '0.0') + '\u00d7', delta:'View Ads for ROAS detail', dcol:'inherit', ...this.sparks(cur, prev, d => d.s) },
     ];
     const kpiOrd = (st.kpiOrder && st.kpiOrder.length === kpisAll.length) ? st.kpiOrder : kpisAll.map(x => x.k);
     this._kpiOrd = kpiOrd;
@@ -1888,8 +1936,8 @@ class Component extends DCLogic {
       const rr = x.u ? x.rfU / x.u : 0;
       return { name:c.n, col:c.c, sales:this.money(x.s), net:this.money(x.ns), native:c.cur === 'USD' ? '\u2014' : this.fx(x.s, c.cur),
         orders:this.num(x.o), aov:this.money2(x.o ? x.s / x.o : 0), units:this.num(x.u), sessions:this.num(x.v),
-        conv:x.v ? this.pct(x.o / x.v, 2) : '\u2014', discRate:this.pct(x.s ? x.dsc / x.s : 0), retRate:this.pct(rr),
-        retCol:rr > retCeil ? 'var(--color-accent-2-700)' : 'inherit', margin:this.pct(x.ns ? x.gp / x.ns : 0),
+        conv:x.v ? this.pct(x.o / x.v, 2) : '\u2014', discRate:this.pct(x.s ? x.dsc / x.s : 0), retRate:st.dataStatus === 'live' ? '\u2014' : this.pct(rr),
+        retCol:rr > retCeil ? 'var(--color-accent-2-700)' : 'inherit', margin:st.dataStatus === 'live' && !liveCostAvailable ? '\u2014' : this.pct(x.ns ? x.gp / x.ns : 0),
         share:cur.s ? this.pct(x.s / cur.s) : '', shareW:(chMax ? x.s / chMax * 100 : 0).toFixed(1) + '%',
         ...this.delta(x.s, p.s), ...contrib(x.s, p.s) };
     });
@@ -1899,7 +1947,7 @@ class Component extends DCLogic {
       return { label:c.n, col:c.c, val:this.money(x.s), ...this.delta(x.s, prev.ch[c.k].s),
         ckIcon:on ? 'ph-check-square' : 'ph-square', ckCol:on ? 'var(--color-accent-600)' : 'var(--color-neutral-500)',
         ckToggle:() => this.setState({ chartOn:{ ...st.chartOn, [c.k]:!on }, hi:null }),
-        note:cur.s ? this.pct(x.s / cur.s) + ' of sales' : '', margin:this.pct(x.ns ? x.gp / x.ns : 0), conv:x.v ? this.pct(x.o / x.v, 2) : '\u2014' };
+        note:cur.s ? this.pct(x.s / cur.s) + ' of sales' : '', margin:st.dataStatus === 'live' && !liveCostAvailable ? '\u2014' : this.pct(x.ns ? x.gp / x.ns : 0), conv:x.v ? this.pct(x.o / x.v, 2) : '\u2014' };
     });
     const rAmz = this.mulberry(Math.floor(st.end / D) + 77);
     const amzRows = ['amzus','amzuk'].filter(k => st.chOn[k]).map(k => {
@@ -1917,7 +1965,14 @@ class Component extends DCLogic {
     let adSpend = 0, fulfil = 0;
     for (const c of this.CH) { const cf = st.chCfg[c.k] || {}; adSpend += cur.ch[c.k].s * (cf.ad != null ? cf.ad / 100 : (this.AD0[c.k] ?? 0.10)); fulfil += cur.ch[c.k].o * (cf.ful != null ? cf.ful : (this.FUL0[c.k] ?? 5)); }
     const contribP = cur.gp - adSpend - fulfil;
-    const pnl = [
+    const pnl = st.dataStatus === 'live' ? [
+      { label:'Net sales', val:this.money(cur.ns), op:'−', col:'inherit' },
+      { label:'COGS', val:liveCostAvailable ? this.money(cur.cogs) : '—', op:'=', col:'inherit' },
+      { label:'Gross profit', val:liveCostAvailable ? this.money(cur.gp) : '—', op:'−', col:'inherit' },
+      { label:'Ad spend', val:'—', op:'−', col:'inherit' },
+      { label:'Fulfilment', val:'—', op:'=', col:'inherit' },
+      { label:'Contribution', val:'Unavailable', op:'', col:'inherit' },
+    ] : [
       { label:'Net sales', val:this.money(cur.ns), op:'\u2212', col:'inherit' },
       { label:'COGS', val:this.money(cur.cogs), op:'=', col:'inherit' },
       { label:'Gross profit', val:this.money(cur.gp), op:'\u2212', col:'inherit' },
@@ -1988,14 +2043,15 @@ class Component extends DCLogic {
 
     const otRate = cur.o ? cur.ot / cur.o : 0, pOtRate = prev.o ? prev.ot / prev.o : 0;
     const agingDays = st.agingDays || 2;
-    const unfulfilled = Math.round(cur.o * 0.028), aging = Math.round(unfulfilled * Math.max(0.04, 0.31 - 0.07 * (agingDays - 2)));
+    const unfulfilled = st.dataStatus === 'live' ? null : Math.round(cur.o * 0.028);
+    const aging = unfulfilled == null ? null : Math.round(unfulfilled * Math.max(0.04, 0.31 - 0.07 * (agingDays - 2)));
     const ordKpis = [
       { label:'Orders', val:this.num(cur.o), ...this.delta(cur.o, prev.o) },
       { label:'Units sold', val:this.num(cur.u), ...this.delta(cur.u, prev.u) },
       { label:'Units per order', val:(cur.o ? cur.u / cur.o : 0).toFixed(2), ...this.delta(cur.o ? cur.u / cur.o : 0, prev.o ? prev.u / prev.o : 0) },
       { label:'Fulfilled on time', val:this.pct(otRate), ...this.delta(otRate, pOtRate) },
       { label:'Refund value', val:this.money(cur.rfS), ...this.delta(cur.rfS, prev.rfS, true) },
-      { label:'Unfulfilled', val:this.num(unfulfilled), delta:aging + ' over ' + agingDays + ' days', dcol:'var(--color-accent-2-700)' },
+      unfulfilled == null ? { label:'Unfulfilled', val:'—', delta:'Full status aggregate unavailable', dcol:'inherit' } : { label:'Unfulfilled', val:this.num(unfulfilled), delta:aging + ' over ' + agingDays + ' days', dcol:'var(--color-accent-2-700)' },
     ];
 
     const r2 = this.mulberry(Math.floor(st.end / D) + 3);
@@ -2007,7 +2063,22 @@ class Component extends DCLogic {
     const rgIdxEn = this.RG.map((g, i) => st.rgOn[g.k] ? i : -1).filter(i => i >= 0);
     let clock = 21 * 60 + 58;
     const orderRows = [];
-    if (CHE.length && rgIdxEn.length) for (let i = 0; i < 12; i++) {
+    if (st.dataStatus === 'live' && Array.isArray(st.livePayload?.recentOrders)) {
+      st.livePayload.recentOrders.slice(0, 50).forEach((order, i) => {
+        const channel = this.CH.find(c => c.k === (order.channel === 'shopify_b2b' ? 'b2b' : 'd2c')) || this.CH[0];
+        const region = this.RG.find(g => g.k === (order.region_code || 'other')) || this.RG.find(g => g.k === 'other');
+        const fulfillment = (order.fulfillment_status || '').toLowerCase();
+        const financial = (order.financial_status || '').toLowerCase();
+        const status = financial.includes('refund') ? 'Refunded' : fulfillment === 'fulfilled' ? 'Fulfilled' : fulfillment === 'partial' || fulfillment === 'partially_fulfilled' ? 'Partially fulfilled' : 'Unfulfilled';
+        const tagClass = status === 'Fulfilled' ? 'tag-accent' : status === 'Refunded' ? 'tag-accent-2' : status === 'Partially fulfilled' ? 'tag-outline' : 'tag-neutral';
+        const tags = Array.isArray(order.tags) ? order.tags : [];
+        const total = +order.total_sales || 0;
+        const time = order.processed_at ? new Date(order.processed_at).toLocaleString('en-GB', { timeZone:'Europe/London', day:'numeric', month:'short', hour:'numeric', minute:'2-digit' }) : '—';
+        orderRows.push({ id:order.order_name || 'Order', time, cust:order.customer_display_name || 'Customer', ch:channel.n, chCol:channel.c, region:region?.n || 'Other',
+          items:String(+order.total_quantity || 0), total:this.money2(total), status, tagClass, tags, tagsTxt:tags.join(', '),
+          _s:{ order:order.order_name || '', date:-i, customer:order.customer_display_name || '', channel:channel.n, region:region?.n || 'Other', items:+order.total_quantity || 0, total, status, tags:tags.join(', ') } });
+      });
+    } else if (CHE.length && rgIdxEn.length) for (let i = 0; i < 12; i++) {
       const tw = CHE.reduce((a, c) => a + CHWb[c.k], 0);
       let pick = r2() * tw, ch = CHE[CHE.length - 1];
       for (const c of CHE) { if (pick < CHWb[c.k]) { ch = c; break; } pick -= CHWb[c.k]; }
@@ -2042,7 +2113,7 @@ class Component extends DCLogic {
       click:() => this.setState({ ordSort:{ col:k2, dir:os && os.col === k2 ? -os.dir : 1 } }) }));
 
     const seedC = Math.floor(st.end / D), seedP = Math.floor((st.start - D) / D);
-    const prodCalc = this.PROD.map(([name, sku, price, w, gm, rr, stock], i) => {
+    const sampleProdCalc = () => this.PROD.map(([name, sku, price, w, gm, rr, stock], i) => {
       const fc = 0.88 + 0.24 * this.mulberry(i * 977 + seedC)();
       const fp = 0.88 + 0.24 * this.mulberry(i * 977 + seedP)();
       const units = Math.round(cur.u * w * fc), pUnits = Math.round(prev.u * w * fp);
@@ -2050,34 +2121,58 @@ class Component extends DCLogic {
       return { name, sku, price, units, gm, rr, stock, sales:units * price, pSales:pUnits * price,
         returned:Math.round(units * rr), cover:perDay > 0 ? stock / perDay : 999 };
     });
+    const prodCalc = st.dataStatus === 'live' && Array.isArray(st.livePayload?.products)
+      ? st.livePayload.products.map(p => {
+          const units = +p.units || 0, returned = +p.refunded_units || 0, sales = +p.net_sales || 0;
+          const stock = p.inventory_quantity == null ? null : +p.inventory_quantity;
+          const perDay = units / nDays;
+          return { name:p.variant_title ? p.title + ' — ' + p.variant_title : p.title, sku:p.sku || '—', price:+p.price || (units ? sales / units : 0), units,
+            gm:sales > 0 && (+p.gross_profit || +p.cogs) ? (+p.gross_profit || 0) / sales : null,
+            rr:units > 0 ? returned / units : null, stock, sales, pSales:sales, returned,
+            cover:stock == null || perDay <= 0 ? 999 : stock / perDay };
+        })
+      : sampleProdCalc();
     const pMax = Math.max(1, ...prodCalc.map(p => p.sales));
     const ps = st.prodSort || { col:'sales', dir:-1 };
     const prodRows = prodCalc.slice().sort((a, b) => { const x = a[ps.col], y = b[ps.col]; return (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y))) * ps.dir; }).map(p => ({
       name:p.name, sku:p.sku, price:this.money2(p.price), units:this.num(p.units), sales:this.money(p.sales),
-      margin:this.pct(p.gm), retRate:this.pct(p.rr), retCol:p.rr > retCeil ? 'var(--color-accent-2-700)' : 'inherit',
-      stock:this.num(p.stock), cover:p.cover >= 999 ? '\u2014' : Math.round(p.cover) + 'd',
+      margin:p.gm == null ? '—' : this.pct(p.gm), retRate:p.rr == null ? '—' : this.pct(p.rr), retCol:p.rr != null && p.rr > retCeil ? 'var(--color-accent-2-700)' : 'inherit',
+      stock:p.stock == null ? '—' : this.num(p.stock), cover:p.cover >= 999 ? '\u2014' : Math.round(p.cover) + 'd',
       coverCol:p.cover < coverDays ? 'var(--color-accent-2-700)' : 'inherit', coverWt:p.cover < coverDays ? '600' : '400',
       shareW:(p.sales / pMax * 100).toFixed(1) + '%', ...this.delta(p.sales, p.pSales) }));
     const prodCols = [['name','Product','left'],['sku','SKU','left'],['price','Price','right'],['units','Units','right'],['sales','Sales','right'],['gm','Margin','right'],['rr','Returns','right'],['stock','Stock','right'],['cover','Cover','right']].map(([k2, label, al]) => ({
       label, al, icon:ps.col === k2 ? (ps.dir > 0 ? 'ph-caret-up' : 'ph-caret-down') : 'ph-caret-up-down', op:ps.col === k2 ? '1' : '0.35',
       click:() => this.setState({ prodSort:{ col:k2, dir:ps.col === k2 ? -ps.dir : (k2 === 'name' || k2 === 'sku' ? 1 : -1) } }) }));
-    const returnRows = prodCalc.slice().sort((a, b) => b.rr - a.rr).slice(0, 5).map(p => ({
+    const returnRows = prodCalc.filter(p => p.rr != null).sort((a, b) => b.rr - a.rr).slice(0, 5).map(p => ({
       name:p.name, units:this.num(p.units), returned:this.num(p.returned), retRate:this.pct(p.rr),
       retCol:p.rr > retCeil ? 'var(--color-accent-2-700)' : 'inherit' }));
-    const deadRows = this.DEAD.map(([name, sku, price, stock]) => ({ name, sku, stock:this.num(stock), value:this.money(price * stock) }));
+    const deadRows = st.dataStatus === 'live' ? [] : this.DEAD.map(([name, sku, price, stock]) => ({ name, sku, stock:this.num(stock), value:this.money(price * stock) }));
     const lowCover = prodCalc.filter(p => p.cover < coverDays).length;
+    const validCover = prodCalc.map(p => p.cover).filter(v => v < 999).sort((a, b) => a - b);
+    const costAvailable = prodCalc.some(p => p.gm != null);
     const prodKpis = [
       { label:'Units sold', val:this.num(cur.u), ...this.delta(cur.u, prev.u) },
-      { label:'Gross margin', val:this.pct(cMar), ...this.delta(cMar, pMar) },
+      costAvailable ? { label:'Gross margin', val:this.pct(cMar), ...this.delta(cMar, pMar) } : { label:'Gross margin', val:'—', delta:'Cost data unavailable', dcol:'inherit' },
       { label:'Return rate', val:this.pct(cRet), ...this.delta(cRet, pRet, true) },
-      { label:'Active SKUs', val:'184', delta:this.DEAD.length + ' with no sales', dcol:'var(--color-accent-2-700)' },
-      { label:'Median days of cover', val:Math.round(prodCalc.map(p => p.cover).sort((a, b) => a - b)[Math.floor(prodCalc.length / 2)]) + 'd', delta:lowCover + ' SKUs under ' + coverDays + 'd', dcol:lowCover ? 'var(--color-accent-2-700)' : 'inherit' },
-      { label:'Sell-through (top 12)', val:'71.2%', ...this.delta(0.712, 0.684) },
+      { label:'Active SKUs', val:st.dataStatus === 'live' ? this.num(prodCalc.length) : '184', delta:st.dataStatus === 'live' ? 'SKUs with sales in range' : this.DEAD.length + ' with no sales', dcol:'inherit' },
+      { label:'Median days of cover', val:validCover.length ? Math.round(validCover[Math.floor(validCover.length / 2)]) + 'd' : '—', delta:validCover.length ? lowCover + ' SKUs under ' + coverDays + 'd' : 'Inventory unavailable', dcol:lowCover ? 'var(--color-accent-2-700)' : 'inherit' },
+      st.dataStatus === 'live' ? { label:'Sell-through', val:'—', delta:'Inventory history unavailable', dcol:'inherit' } : { label:'Sell-through (top 12)', val:'71.2%', ...this.delta(0.712, 0.684) },
     ];
 
-    const custN = Math.round(cur.o * 0.74), pCustN = Math.round(prev.o * 0.74);
-    const repeatRate = cur.o ? 1 - (cur.o * 0.58) / cur.o : 0;
-    const custKpis = [
+    const liveCustomers = st.dataStatus === 'live' ? (st.livePayload?.customers || {}) : null;
+    const custN = liveCustomers ? (+liveCustomers.customers || 0) : Math.round(cur.o * 0.74);
+    const pCustN = liveCustomers ? custN : Math.round(prev.o * 0.74);
+    const newCustN = liveCustomers ? (+liveCustomers.newCustomers || 0) : custN * 0.62;
+    const repeatRate = liveCustomers ? (custN ? (+liveCustomers.repeatCustomers || 0) / custN : 0) : 0.384;
+    const ordersPerCustomer = custN ? cur.o / custN : 0;
+    const custKpis = liveCustomers ? [
+      { label:'Customers', val:this.num(custN), delta:'Live Shopify customers', dcol:'inherit' },
+      { label:'New customers', val:this.num(newCustN), delta:'First order in range', dcol:'inherit' },
+      { label:'Repeat rate', val:this.pct(repeatRate), delta:'Known customer history', dcol:'inherit' },
+      { label:'Orders per customer', val:ordersPerCustomer.toFixed(2), delta:'Current range', dcol:'inherit' },
+      { label:'Net sales / customer', val:this.money2(custN ? cur.ns / custN : 0), delta:'Current range', dcol:'inherit' },
+      { label:'90-day LTV', val:'—', delta:'Cohort history unavailable', dcol:'inherit' },
+    ] : [
       { label:'Customers', val:this.num(custN), ...this.delta(custN, pCustN) },
       { label:'New customers', val:this.num(custN * 0.62), ...this.delta(custN * 0.62, pCustN * 0.64) },
       { label:'Repeat rate', val:this.pct(0.384), ...this.delta(0.384, 0.371) },
@@ -2085,7 +2180,7 @@ class Component extends DCLogic {
       { label:'Net sales / customer', val:this.money2(custN ? cur.ns / custN : 0), ...this.delta(custN ? cur.ns / custN : 0, pCustN ? prev.ns / pCustN : 0) },
       { label:'90-day LTV', val:this.money2(148.20), ...this.delta(148.2, 141.6) },
     ];
-    const cohortRows = [0, 1, 2, 3, 4, 5].map(i => {
+    const cohortRows = liveCustomers ? [] : [0, 1, 2, 3, 4, 5].map(i => {
       const mIdx = pm - 5 + i, dt = new Date(Date.UTC(nowD.getUTCFullYear(), mIdx, 1));
       const rc = this.mulberry(9000 + mIdx);
       const mA = this.agg(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), 1), Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth() + 1, 0));
@@ -2099,8 +2194,11 @@ class Component extends DCLogic {
         opc:opc.toFixed(2), ltv:this.money2(ltv), retained:this.pct(repeat * opc / 2), barW:(Math.min(1, repeat * opc / 1.4) * 100).toFixed(0) + '%' };
     });
     const ACC = [['Westlake Volleyball Club','United States',.24,'21d'],['Northshore Beach Academy','Australia',.18,'27d'],['London Lions VC','United Kingdom',.15,'34d'],['Rheinland SportHaus','Europe',.13,'29d'],['Pacific Prep Athletics','United States',.11,'45d'],['Brighton Volley Co-op','United Kingdom',.08,'61d']];
-    const custRows = ACC.map(([name, region, w, cadence], i) => ({ name, region, cadence, orders:this.num(cur.ch.b2b.o * w), spend:this.money(cur.ch.b2b.s * w),
-      tag:i < 4 ? 'Active' : 'Renewal due', tagClass:i < 4 ? 'tag-accent' : 'tag-accent-2' }));
+    const custRows = liveCustomers && Array.isArray(liveCustomers.wholesaleAccounts)
+      ? liveCustomers.wholesaleAccounts.map(account => ({ name:account.name || 'Wholesale account', region:(this.RG.find(g => g.k === account.region_code) || {}).n || 'Other', cadence:'—',
+          orders:this.num(account.orders), spend:this.money(account.net_sales), tag:'Live', tagClass:'tag-accent' }))
+      : ACC.map(([name, region, w, cadence], i) => ({ name, region, cadence, orders:this.num(cur.ch.b2b.o * w), spend:this.money(cur.ch.b2b.s * w),
+          tag:i < 4 ? 'Active' : 'Renewal due', tagClass:i < 4 ? 'tag-accent' : 'tag-accent-2' }));
 
     const goView = (v) => () => { this.setState({ view:v, continuous:false, hi:null }); window.scrollTo(0, 0); };
     const flags = [
@@ -2108,7 +2206,7 @@ class Component extends DCLogic {
       { k:'stock', icon:'ph-warning-diamond', col:'var(--color-accent-2-600)', text:lowCover + ' SKUs under ' + coverDays + ' days of cover', go:goView('products') },
       { k:'returns', icon:'ph-arrow-u-down-left', col:cRet > pRet ? 'var(--color-accent-2-600)' : 'var(--color-accent-600)', text:'Return rate ' + this.pct(cRet) + (cRet > pRet ? ' \u2014 up on last period' : ' \u2014 improving'), go:goView('products') },
       { k:'pace', icon:'ph-target', col:pctTarget >= 1 ? 'var(--color-accent-600)' : 'var(--color-accent-2-600)', text:'Month pacing at ' + this.pct(pctTarget, 0) + ' of target', go:goView('overview') },
-    ].filter(f => st.flagsOn[f.k] ?? true);
+    ].filter(f => (st.flagsOn[f.k] ?? true) && !(st.dataStatus === 'live' && f.k === 'unful'));
     // morning brief — yesterday vs the day before, plus standing risks
     const yA = this.agg(this.NOW - D, this.NOW - D), y2A = this.agg(this.NOW - 2 * D, this.NOW - 2 * D);
     const yd = y2A.s ? (yA.s - y2A.s) / y2A.s * 100 : 0;
@@ -2120,8 +2218,7 @@ class Component extends DCLogic {
       date:this.fmtDate(this.NOW - D, true),
       text:'Yesterday: ' + this.money(yA.s) + ' (' + (yd >= 0 ? '+' : '\u2212') + Math.abs(yd).toFixed(0) + '% vs the day before). ' +
         (topCh ? topCh.n + (topChg >= 0 ? ' drove the gain, up ' : ' dragged, down ') + this.kMoney(Math.abs(topChg)) + '. ' : '') +
-        'Conversion ' + (yConv >= y2Conv ? 'held at ' : 'slipped to ') + this.pct(yConv, 2) + '. ' +
-        aging + ' orders aging past 2 days' +
+        (st.dataStatus === 'live' ? 'Conversion and aging-order metrics are unavailable until their source data is connected. ' : 'Conversion ' + (yConv >= y2Conv ? 'held at ' : 'slipped to ') + this.pct(yConv, 2) + '. ' + aging + ' orders aging past 2 days') +
         (minCover && minCover.cover < coverDays ? '; ' + minCover.name + ' is ~' + Math.round(minCover.cover) + ' days from stockout' : '') +
         '. Month pacing at ' + this.pct(pctTarget, 0) + ' of target.',
     }] : [];
@@ -2226,8 +2323,22 @@ class Component extends DCLogic {
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 5000);
     };
+    const updatedMs = st.dataUpdatedAt ? Date.parse(st.dataUpdatedAt) : NaN;
+    const stale = st.dataStatus === 'live' && Number.isFinite(updatedMs) && Date.now() - updatedMs > 2 * 60 * 60 * 1000;
+    const coverage = st.dataCoverageStart && st.dataCoverageEnd ? ' · coverage ' + st.dataCoverageStart + ' to ' + st.dataCoverageEnd : '';
+    const statusMap = st.dataStatus === 'loading'
+      ? { label:'Connecting to live Flavour Blaster data…', icon:'ph-circle-notch', color:'var(--color-neutral-700)', bg:'var(--color-neutral-100)', border:'var(--sd-line)' }
+      : st.dataStatus === 'live' && !stale
+        ? { label:'Live Shopify data' + coverage, icon:'ph-broadcast', color:'var(--color-accent-700)', bg:'var(--color-accent-100)', border:'var(--color-accent-300)' }
+        : st.dataStatus === 'live'
+          ? { label:'Stale live data — last successful refresh ' + (st.dataUpdatedAt || 'unknown') + coverage, icon:'ph-warning', color:'var(--color-accent-2-700)', bg:'var(--color-accent-2-100)', border:'var(--color-accent-2-300)' }
+          : st.dataStatus === 'empty'
+            ? { label:'Sample fallback — no Shopify records have been imported yet', icon:'ph-flask', color:'var(--color-accent-2-700)', bg:'var(--color-accent-2-100)', border:'var(--color-accent-2-300)' }
+            : { label:'Sample fallback — live data is unavailable', icon:'ph-cloud-slash', color:'var(--color-accent-2-700)', bg:'var(--color-accent-2-100)', border:'var(--color-accent-2-300)' };
     return {
       navItems, flags:flags.map(f => ({ ...f, goBell:() => { this.setState({ bellOpen:false }); f.go(); } })), briefL, pnl, anomalyFeed, hasAnoms, amzRows, hasAmz, exportCsv,
+      dataStatusLabel:statusMap.label, dataStatusIcon:statusMap.icon, dataStatusColor:statusMap.color, dataStatusBg:statusMap.bg, dataStatusBorder:statusMap.border,
+      dataCanRetry:st.dataStatus === 'error' || st.dataStatus === 'empty', retryLive:() => this.loadLiveData(),
       searchQ:st.searchQ || '', searchOpen:!!sq && searchResults.length > 0, searchResults,
       searchExpanded:st.searchExp, searchCollapsed:!st.searchExp,
       searchExpand:() => { this.setState({ searchExp:true }); setTimeout(() => { const el = document.querySelector('[data-lg-search]'); if (el) el.focus(); }, 60); },
@@ -2270,6 +2381,9 @@ class Component extends DCLogic {
       storeChip:((st.brandName || 'SL').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2) || 'SL').toUpperCase(),
       printedDate:this.fmtDate(this.NOW, true), repCur:st.repCur,
       fxNote:'\u00a3' + this.fxRates.GBP + ' / \u20ac' + this.fxRates.EUR + ' / A$' + this.fxRates.AUD + ' per USD',
+      regionDataNote:st.dataStatus === 'live'
+        ? 'Region is derived from the Shopify shipping country, falling back to billing country. Orders without a supported market mapping appear as Other.'
+        : 'Local amounts converted at \u00a3' + this.fxRates.GBP + ' / \u20ac' + this.fxRates.EUR + ' / A$' + this.fxRates.AUD + ' per USD. Amazon UK settles in GBP; Shopify D2C bills EUR and AUD carts in local currency.',
       viewTitle:st.continuous ? 'Full dashboard' : title, rangeLabel, compareNote,
       dateBtnLabel:pr ? pr[1] : rangeLabel,
       continuous:st.continuous, segSec:this.mkSeg(!st.continuous), segCont:this.mkSeg(st.continuous),
@@ -2376,20 +2490,19 @@ class Component extends DCLogic {
       sbX:(pickHsv.s * 100).toFixed(1) + '%', sbY:((1 - pickHsv.v) * 100).toFixed(1) + '%',
       hueX:(pickHsv.h / 360 * 100).toFixed(1) + '%', hueCol,
       dataOpts:[
-        ['sample','Sample data (generated)','Deterministic demo numbers \u2014 works offline, no setup','ph-flask'],
-        ['csv','CSV file link','A hosted CSV export \u2014 a snapshot at export time','ph-file-csv'],
-        ['sheets','Google Sheets link','A sheet published to the web \u2014 refreshes as the sheet updates','ph-table'],
+        ['live','Live Shopify data','Server-side API backed by Flavour Blaster Supabase','ph-broadcast'],
       ].map(([k, label, sub, icon]) => ({ label, sub, icon, wt:st.dataMode === k ? '600' : '400', checkOp:st.dataMode === k ? '1' : '0', click:() => this.setState({ dataMode:k }) })),
-      showUrl:st.dataMode !== 'sample', dataUrl:st.dataUrl,
-      urlPlaceholder:st.dataMode === 'sheets' ? 'https://docs.google.com/spreadsheets/d/\u2026/pub?output=csv' : 'https://example.com/exports/sales.csv',
+      showUrl:false, dataUrl:st.dataUrl,
+      urlPlaceholder:'/api/dashboard',
       setDataUrl:(e) => this.setState({ dataUrl:e.target.value }),
-      srcNote:st.dataMode === 'sheets' ? 'In Sheets: File \u2192 Share \u2192 Publish to web \u2192 CSV, then paste the link. The link stays live, so the dashboard can refresh on every load.' : 'A CSV link is a snapshot \u2014 re-export and update the link to refresh the numbers.',
+      srcNote:'The browser never receives Shopify or Supabase credentials. Google Sheets remains an audit output, not a runtime dependency.',
       growthVal:String(growth), setGrowth:(e) => this.setState({ growthO:Math.max(0, +e.target.value || 0) }),
       coverVal:String(coverDays), setCover:(e) => this.setState({ coverO:Math.max(1, Math.round(+e.target.value || 1)) }),
       retVal:String(+(retCeil * 100).toFixed(1)), setRet:(e) => this.setState({ retO:Math.max(0.5, +e.target.value || 0.5) }),
       isOverview:st.continuous || st.view === 'overview', isChannels:st.continuous || st.view === 'channels', isRegions:st.continuous || st.view === 'regions',
       isOrders:st.continuous || st.view === 'orders', isProducts:st.continuous || st.view === 'products', isCustomers:st.continuous || st.view === 'customers',
-      isAds:st.continuous || st.view === 'ads', adKpis, chartAdsL:[chartAds], adPlatRows, adCampCols, adCampRows,
+      customerHistoryUnavailable:st.dataStatus === 'live', customerHistoryAvailable:st.dataStatus !== 'live',
+      isAds:st.continuous || st.view === 'ads', adUnavailable:st.dataStatus === 'live', adDataAvailable:st.dataStatus !== 'live', adKpis, chartAdsL:[chartAds], adPlatRows, adCampCols, adCampRows,
       ordCols, ordTagQ, ordTagInput:e => this.setState({ ordTagQ:e.target.value }), ordTagReset:() => this.setState({ ordTagQ:'' }), prodCols, kpis, chRows, chCards, regRows, regCards, heat, ordKpis, orderRows, prodRows, prodKpis, deadRows, returnRows, custKpis, custRows, cohortRows, filterDDs,
     };
   }
