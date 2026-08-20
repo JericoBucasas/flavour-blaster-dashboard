@@ -65,7 +65,7 @@
     .prod-expand:hover .prod-expand-title { color:var(--color-accent-700); }
     .prod-expand:focus-visible { outline:2px solid var(--color-accent-500);outline-offset:3px; }
     .prod-location-panel { margin:2px 0 6px;padding:14px 16px;background:var(--sd-canvas);border:1px solid var(--sd-line);border-radius:10px; }
-    .prod-location-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:0 24px;margin-top:10px; }
+    .prod-location-grid { display:grid;grid-template-columns:minmax(0,1fr);margin-top:10px; }
     .prod-location-item { display:flex;align-items:center;justify-content:space-between;gap:16px;min-width:0;padding:8px 0;border-top:1px solid var(--sd-line); }
     #lg-bbar, #lg-fab { display: none; }
     @media (max-width: 920px) {
@@ -870,7 +870,7 @@
                         <sc-if value="{{ r.hasLocations }}" hint-placeholder-val="{{ true }}">
                           <div class="prod-location-grid">
                             <sc-for list="{{ r.locationRows }}" as="loc" hint-placeholder-count="7">
-                              <div class="prod-location-item"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ loc.name }}">{{ loc.name }}</span><span style="font-weight:650;font-variant-numeric:tabular-nums;color:{{ loc.col }};white-space:nowrap">{{ loc.available }}</span></div>
+                              <div class="prod-location-item"><span style="min-width:0;overflow-wrap:anywhere" title="{{ loc.name }}">{{ loc.name }}</span><span style="font-weight:650;font-variant-numeric:tabular-nums;color:{{ loc.col }};white-space:nowrap">{{ loc.available }}</span></div>
                             </sc-for>
                           </div>
                         </sc-if>
