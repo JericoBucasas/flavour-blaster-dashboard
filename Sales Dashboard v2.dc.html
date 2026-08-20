@@ -61,9 +61,9 @@
     .sd-card:not(:has(*)) { display: none; }
     .sd-grid2 > div { background: var(--sd-card); border: 1px solid var(--sd-line); border-radius: 12px; padding: 16px 18px; box-shadow: var(--sd-sh); }
     .table th, .table td { padding: 8px 10px; font-size: 13px; }
-    .prod-expand { appearance:none;display:flex;align-items:center;gap:8px;width:100%;min-width:0;padding:2px 0;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer;border-radius:6px; }
-    .prod-expand:hover .prod-expand-title { color:var(--color-accent-700); }
-    .prod-expand:focus-visible { outline:2px solid var(--color-accent-500);outline-offset:3px; }
+    .prod-inventory-expand { appearance:none;display:inline-flex;align-items:center;justify-content:flex-end;gap:6px;width:100%;padding:3px 0;border:0;background:transparent;color:inherit;font:inherit;text-align:right;cursor:pointer;border-radius:6px;font-variant-numeric:tabular-nums; }
+    .prod-inventory-expand:hover { color:var(--color-accent-700); }
+    .prod-inventory-expand:focus-visible { outline:2px solid var(--color-accent-500);outline-offset:3px; }
     .prod-location-panel { margin:2px 0 6px;padding:14px 16px;background:var(--sd-canvas);border:1px solid var(--sd-line);border-radius:10px; }
     .prod-location-grid { display:grid;grid-template-columns:minmax(0,1fr);margin-top:10px; }
     .prod-location-item { display:flex;align-items:center;justify-content:space-between;gap:16px;min-width:0;padding:8px 0;border-top:1px solid var(--sd-line); }
@@ -838,30 +838,30 @@
             </div>
           </sc-for>
         </div><div style="display:contents">
-        </div><div class="sd-card"><div class="sd-card-h" style="display:flex;align-items:center;justify-content:space-between;gap:12px"><span>Shopify product catalog</span><select class="input" value="{{ productStatus }}" onChange="{{ setProductStatus }}" aria-label="Filter products by status" style="max-width:180px"><option value="active">Active products</option><option value="all">All statuses</option><option value="draft">Draft products</option><option value="archived">Archived products</option></select></div>
+        </div><div class="sd-card"><div class="sd-card-h" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><span>Shopify product catalog</span><div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap"><select class="input" value="{{ productStatus }}" onChange="{{ setProductStatus }}" aria-label="Filter products by status" style="max-width:180px"><option value="active">Active products</option><option value="all">All statuses</option><option value="draft">Draft products</option><option value="archived">Archived products</option></select><div style="position:relative"><button type="button" class="btn btn-secondary" onClick="{{ prodColumnsToggle }}" aria-expanded="{{ prodColumnsOpen }}" aria-label="Choose visible product columns" style="white-space:nowrap"><i class="ph-duotone ph-columns" style="font-size:15px"></i> Columns {{ prodColumnCount }} of 13 <i class="ph-duotone ph-caret-down" style="font-size:12px;opacity:0.6"></i></button><sc-if value="{{ prodColumnsOpen }}" hint-placeholder-val="{{ false }}"><div onClick="{{ prodColumnsClose }}" style="position:fixed;inset:0;z-index:49"></div><div class="sd-pop" style="position:absolute;right:0;top:calc(100% + 6px);z-index:50;width:240px;max-width:calc(100vw - 40px);background:var(--sd-card);border:1px solid var(--sd-line);border-radius:12px;box-shadow:var(--shadow-lg);padding:6px"><div style="font-size:11.5px;font-weight:600;opacity:0.6;padding:6px 8px">Visible columns</div><sc-for list="{{ prodColumnOptions }}" as="pco"><button type="button" onClick="{{ pco.toggle }}" aria-pressed="{{ pco.on }}" style="appearance:none;display:flex;align-items:center;gap:9px;width:100%;border:0;background:{{ pco.bg }};color:inherit;font:inherit;font-size:13px;font-weight:{{ pco.wt }};text-align:left;padding:8px;border-radius:7px;cursor:pointer"><i class="ph-duotone {{ pco.icon }}" style="font-size:16px;color:{{ pco.col }};flex:none"></i><span>{{ pco.label }}</span></button></sc-for></div></sc-if></div></div></div>
         <div style="overflow-x:auto">
-          <table class="table" style="width:100%;min-width:1480px">
+          <table class="table" style="width:100%;min-width:{{ prodTableMinWidth }}">
             <thead><tr><sc-for list="{{ prodCols }}" as="pc"><th onClick="{{ pc.click }}" title="Sort by this column" style="cursor:pointer;user-select:none;white-space:nowrap;text-align:{{ pc.al }}">{{ pc.label }} <i class="ph-duotone {{ pc.icon }}" style="font-size:11px;opacity:{{ pc.op }}"></i></th></sc-for></tr></thead>
             <tbody>
               <sc-for list="{{ prodRows }}" as="r" hint-placeholder-count="8">
                 <tr style="background:{{ r.rowBg }}">
-                  <td title="{{ r.detailText }}"><button type="button" class="prod-expand" onClick="{{ r.toggle }}" aria-expanded="{{ r.expanded }}" aria-label="{{ r.expandLabel }}"><i class="ph-duotone {{ r.expandIcon }}" style="font-size:14px;color:var(--color-accent-600);flex:none"></i><span style="min-width:0"><span class="prod-expand-title" style="display:block;font-weight:600">{{ r.name }}</span><span style="display:block;font-size:11.5px;opacity:0.65">{{ r.variant }}</span></span></button></td>
-                  <td style="opacity:0.6">{{ r.sku }}</td>
-                  <td><span class="tag {{ r.statusClass }}">{{ r.status }}</span></td>
-                  <td title="{{ r.vendorType }}">{{ r.vendor }}</td>
-                  <td title="{{ r.tagsText }}" style="max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.tagsText }}</td>
-                  <td style="text-align:right;font-variant-numeric:tabular-nums">{{ r.price }}</td>
-                  <td style="text-align:right;font-variant-numeric:tabular-nums">{{ r.cost }}</td>
-                  <td style="text-align:right;font-variant-numeric:tabular-nums">{{ r.margin }}</td>
-                  <td style="text-align:right;font-variant-numeric:tabular-nums">{{ r.units }}</td>
-                  <td style="text-align:right;font-variant-numeric:tabular-nums">{{ r.sales }}<div style="font-size:11.5px;font-weight:600;color:{{ r.dcol }}">{{ r.delta }}</div></td>
-                  <td style="text-align:right;font-variant-numeric:tabular-nums">{{ r.stock }}</td>
-                  <td title="{{ r.locationsText }}" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.locationsText }}</td>
-                  <td style="white-space:nowrap">{{ r.updated }}</td>
+                  <sc-if value="{{ showProdName }}" hint-placeholder-val="{{ true }}"><td title="{{ r.detailText }}"><span style="display:block;font-weight:600">{{ r.name }}</span><span style="display:block;font-size:11.5px;opacity:0.65">{{ r.variant }}</span></td></sc-if>
+                  <sc-if value="{{ showProdSku }}" hint-placeholder-val="{{ false }}"><td style="opacity:0.6">{{ r.sku }}</td></sc-if>
+                  <sc-if value="{{ showProdStatus }}" hint-placeholder-val="{{ true }}"><td><span class="tag {{ r.statusClass }}">{{ r.status }}</span></td></sc-if>
+                  <sc-if value="{{ showProdVendor }}" hint-placeholder-val="{{ false }}"><td title="{{ r.vendorType }}">{{ r.vendor }}</td></sc-if>
+                  <sc-if value="{{ showProdTags }}" hint-placeholder-val="{{ false }}"><td title="{{ r.tagsText }}" style="max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.tagsText }}</td></sc-if>
+                  <sc-if value="{{ showProdPrice }}" hint-placeholder-val="{{ true }}"><td style="text-align:right;font-variant-numeric:tabular-nums">{{ r.price }}</td></sc-if>
+                  <sc-if value="{{ showProdCost }}" hint-placeholder-val="{{ false }}"><td style="text-align:right;font-variant-numeric:tabular-nums">{{ r.cost }}</td></sc-if>
+                  <sc-if value="{{ showProdMargin }}" hint-placeholder-val="{{ false }}"><td style="text-align:right;font-variant-numeric:tabular-nums">{{ r.margin }}</td></sc-if>
+                  <sc-if value="{{ showProdUnits }}" hint-placeholder-val="{{ true }}"><td style="text-align:right;font-variant-numeric:tabular-nums">{{ r.units }}</td></sc-if>
+                  <sc-if value="{{ showProdSales }}" hint-placeholder-val="{{ false }}"><td style="text-align:right;font-variant-numeric:tabular-nums">{{ r.sales }}<div style="font-size:11.5px;font-weight:600;color:{{ r.dcol }}">{{ r.delta }}</div></td></sc-if>
+                  <sc-if value="{{ showProdStock }}" hint-placeholder-val="{{ true }}"><td style="text-align:right"><button type="button" class="prod-inventory-expand" onClick="{{ r.toggle }}" aria-expanded="{{ r.expanded }}" aria-label="{{ r.expandLabel }}"><span>{{ r.stock }}</span><i class="ph-duotone {{ r.expandIcon }}" style="font-size:13px;color:var(--color-accent-600);flex:none"></i></button></td></sc-if>
+                  <sc-if value="{{ showProdLocations }}" hint-placeholder-val="{{ false }}"><td title="{{ r.locationsText }}" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.locationsText }}</td></sc-if>
+                  <sc-if value="{{ showProdUpdated }}" hint-placeholder-val="{{ false }}"><td style="white-space:nowrap">{{ r.updated }}</td></sc-if>
                 </tr>
                 <sc-if value="{{ r.expanded }}" hint-placeholder-val="{{ false }}">
                   <tr>
-                    <td colspan="13" style="padding-top:0">
+                    <td colspan="{{ prodColumnCount }}" style="padding-top:0">
                       <div class="prod-location-panel">
                         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
                           <div><div style="font-weight:650">Inventory by location</div><div style="font-size:12px;opacity:0.6;margin-top:2px">{{ r.sku }} · Shopify inventory for this variant</div></div>
@@ -1423,7 +1423,8 @@ class Component extends DCLogic {
       theme:(hp.t && this.THEMES.some(t => t[0] === hp.t)) ? hp.t : (hp.d === '1' ? 'ink' : (ls.theme && this.THEMES.some(t => t[0] === ls.theme) ? ls.theme : 'paper')),
       accent:'custom',
       accentHex:(hp.ah && /^[0-9a-fA-F]{6}$/.test(hp.ah)) ? '#' + hp.ah : (ls.brandV === 2 && ls.accentHex ? ls.accentHex : '#c9377e'),
-      hsv:null, accHexDraft:null, accPickOpen:false, searchQ:'', searchExp:false, selKpi:'gross', chartOn:{}, ordSort:null, prodSort:null, productStatus:'active', expandedProduct:null,
+      hsv:null, accHexDraft:null, accPickOpen:false, searchQ:'', searchExp:false, selKpi:'gross', chartOn:{}, ordSort:null, prodSort:null, productStatus:'active', expandedProduct:null, prodColumnsOpen:false,
+      prodColOn:{ name:true, sku:false, status:true, vendor:false, tags:false, price:true, cost:false, gm:false, units:true, sales:false, stock:true, locations:false, updatedAt:false },
       brandName:ls.brandV >= 3 && ls.brandName ? ls.brandName : 'Flavour Blaster', brandTag:ls.brandV >= 3 && ls.brandTag ? ls.brandTag : 'The Art of Aroma, Perfected!', logoData:ls.brandV >= 3 && ls.logoData ? ls.logoData : './assets/flavour-blaster-b.jpeg', growthO:ls.growthO ?? null, coverO:ls.coverO ?? null, retO:ls.retO ?? null, areaO:ls.areaO ?? null, dataMode:'live', dataUrl:'/api/dashboard',
       dataStatus:'loading', dataError:null, dataUpdatedAt:null, dataCoverageStart:null, dataCoverageEnd:null, dataBaseCurrency:null, livePayload:null,
       repCur:ls.repCur || 'USD', fxAuto:ls.fxAuto ?? true, fxFetched:null, targetMode:ls.targetMode || 'growth', targetAbs:ls.targetAbs ?? null, chCfg:ls.chCfg || {}, rgCfg:ls.rgCfg || {},
@@ -2206,9 +2207,16 @@ class Component extends DCLogic {
       detailText:['Type: ' + (p.productType || '—'), 'Barcode: ' + (p.barcode || '—'), 'Handle: ' + (p.handle || '—'), 'Options: ' + (p.selected || '—'), 'Collections: ' + (p.collections || '—'), 'Inventory policy: ' + (p.inventoryPolicy || '—'), 'Tracked: ' + String(p.tracked ?? '—'), 'Taxable: ' + String(p.taxable ?? '—'), 'Requires shipping: ' + String(p.requiresShipping ?? '—'), 'Weight: ' + (p.weight || '—'), 'Media: ' + (p.mediaCount || 0), 'Metafields: ' + (p.metafieldCount || 0), 'SEO title: ' + (p.seoTitle || '—'), 'SEO description: ' + (p.seoDescription || '—'), 'Description: ' + (p.description || '—'), 'Rename history: ' + (p.renamed || 'None')].join('\n'),
       ...this.delta(p.sales, p.pSales) };
     });
-    const prodCols = [['name','Product / variant','left'],['sku','SKU','left'],['status','Status','left'],['vendor','Vendor','left'],['tags','Tags','left'],['price','Price','right'],['cost','Cost','right'],['gm','Margin','right'],['units','Units sold','right'],['sales','Sales','right'],['stock','Inventory','right'],['locations','Locations','left'],['updatedAt','Updated','left']].map(([k2, label, al]) => ({
+    const prodColumnDefs = [['name','Product / variant','left'],['sku','SKU','left'],['status','Status','left'],['vendor','Vendor','left'],['tags','Tags','left'],['price','Price','right'],['cost','Cost','right'],['gm','Margin','right'],['units','Units sold','right'],['sales','Sales','right'],['stock','Inventory','right'],['locations','Locations','left'],['updatedAt','Updated','left']];
+    const prodColumnCount = prodColumnDefs.filter(([k2]) => !!st.prodColOn[k2]).length;
+    const prodCols = prodColumnDefs.filter(([k2]) => !!st.prodColOn[k2]).map(([k2, label, al]) => ({
       label, al, icon:ps.col === k2 ? (ps.dir > 0 ? 'ph-caret-up' : 'ph-caret-down') : 'ph-caret-up-down', op:ps.col === k2 ? '1' : '0.35',
       click:() => this.setState({ prodSort:{ col:k2, dir:ps.col === k2 ? -ps.dir : (k2 === 'name' || k2 === 'sku' ? 1 : -1) } }) }));
+    const prodColumnOptions = prodColumnDefs.map(([k2, label]) => {
+      const on = !!st.prodColOn[k2];
+      return { label, on, icon:on ? 'ph-check-square' : 'ph-square', col:on ? 'var(--color-accent-700)' : 'inherit', bg:on ? 'var(--color-neutral-200)' : 'transparent', wt:on ? '600' : '400',
+        toggle:() => { if (on && prodColumnCount === 1) return; this.setState({ prodColOn:{ ...st.prodColOn, [k2]:!on }, prodSort:on && ps.col === k2 ? null : st.prodSort, expandedProduct:k2 === 'stock' && on ? null : st.expandedProduct }); } };
+    });
     const returnRows = prodCalc.filter(p => p.rr != null).sort((a, b) => b.rr - a.rr).slice(0, 5).map(p => ({
       name:p.name, units:this.num(p.units), returned:this.num(p.returned), retRate:this.pct(p.rr),
       retCol:p.rr > retCeil ? 'var(--color-accent-2-700)' : 'inherit' }));
@@ -2578,7 +2586,13 @@ class Component extends DCLogic {
       isOrders:st.continuous || st.view === 'orders', isProducts:st.continuous || st.view === 'products', isCustomers:st.continuous || st.view === 'customers',
       customerHistoryUnavailable:st.dataStatus === 'live', customerHistoryAvailable:st.dataStatus !== 'live',
       isAds:st.continuous || st.view === 'ads', adUnavailable:st.dataStatus === 'live', adDataAvailable:st.dataStatus !== 'live', adKpis, chartAdsL:[chartAds], adPlatRows, adCampCols, adCampRows,
-      ordCols, ordTagQ, ordTagInput:e => this.setState({ ordTagQ:e.target.value }), ordTagReset:() => this.setState({ ordTagQ:'' }), productStatus:st.productStatus, setProductStatus:e => this.setState({ productStatus:e.target.value, prodSort:null, expandedProduct:null }), prodCols, kpis, chRows, chCards, regRows, regCards, heat, ordKpis, orderRows, prodRows, prodKpis, deadRows, returnRows, custKpis, custRows, cohortRows, filterDDs,
+      ordCols, ordTagQ, ordTagInput:e => this.setState({ ordTagQ:e.target.value }), ordTagReset:() => this.setState({ ordTagQ:'' }), productStatus:st.productStatus, setProductStatus:e => this.setState({ productStatus:e.target.value, prodSort:null, expandedProduct:null, prodColumnsOpen:false }), prodCols,
+      prodColumnOptions, prodColumnCount, prodTableMinWidth:Math.max(720, 220 + Math.max(0, prodColumnCount - 1) * 105) + 'px', prodColumnsOpen:st.prodColumnsOpen,
+      prodColumnsToggle:() => this.setState({ prodColumnsOpen:!st.prodColumnsOpen }), prodColumnsClose:() => this.setState({ prodColumnsOpen:false }),
+      showProdName:!!st.prodColOn.name, showProdSku:!!st.prodColOn.sku, showProdStatus:!!st.prodColOn.status, showProdVendor:!!st.prodColOn.vendor, showProdTags:!!st.prodColOn.tags,
+      showProdPrice:!!st.prodColOn.price, showProdCost:!!st.prodColOn.cost, showProdMargin:!!st.prodColOn.gm, showProdUnits:!!st.prodColOn.units, showProdSales:!!st.prodColOn.sales,
+      showProdStock:!!st.prodColOn.stock, showProdLocations:!!st.prodColOn.locations, showProdUpdated:!!st.prodColOn.updatedAt,
+      kpis, chRows, chCards, regRows, regCards, heat, ordKpis, orderRows, prodRows, prodKpis, deadRows, returnRows, custKpis, custRows, cohortRows, filterDDs,
     };
   }
   buildCal(baseT, selS, selE, pick) {
