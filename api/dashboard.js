@@ -1,6 +1,6 @@
 'use strict';
 
-const { parseDate, buildSnapshotRequest, sanitizeSnapshot } = require('../lib/dashboard-request');
+const { parseDate, buildSnapshotRequest, buildCatalogRequest, sanitizeSnapshot } = require('../lib/dashboard-request');
 
 module.exports = async function dashboard(req, res) {
   if (req.method !== 'GET') {
@@ -21,21 +21,33 @@ module.exports = async function dashboard(req, res) {
 
   const secretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
   let request;
+  let catalogRequest;
   try {
     request = buildSnapshotRequest(process.env.SUPABASE_URL, secretKey, start, end);
+    catalogRequest = buildCatalogRequest(process.env.SUPABASE_URL, secretKey);
   } catch (_error) {
     return res.status(503).json({ status: 'unavailable', code: 'DATASTORE_NOT_CONFIGURED' });
   }
 
   try {
-    const upstream = await fetch(request.url, request.options);
-    const body = await upstream.json().catch(() => null);
-    if (!upstream.ok) {
+    const [upstream, catalogUpstream] = await Promise.all([
+      fetch(request.url, request.options),
+      fetch(catalogRequest.url, catalogRequest.options),
+    ]);
+    const [body, catalogBody] = await Promise.all([
+      upstream.json().catch(() => null),
+      catalogUpstream.json().catch(() => null),
+    ]);
+    if (!upstream.ok || !catalogUpstream.ok) {
       return res.status(502).json({ status: 'error', code: 'DATASTORE_QUERY_FAILED' });
     }
     const data = sanitizeSnapshot(body);
+    const productCatalog = Array.isArray(catalogBody) ? catalogBody[0] : catalogBody;
+    if (!productCatalog || typeof productCatalog !== 'object' || !Array.isArray(productCatalog.products)) {
+      return res.status(502).json({ status: 'error', code: 'PRODUCT_CATALOG_INVALID' });
+    }
     res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
-    return res.status(200).json({ status: 'live', data });
+    return res.status(200).json({ status: 'live', data:{ ...data, productCatalog } });
   } catch (_error) {
     return res.status(502).json({ status: 'error', code: 'DATASTORE_UNREACHABLE' });
   }
