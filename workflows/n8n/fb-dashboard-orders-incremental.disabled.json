@@ -54,7 +54,7 @@
       "parameters": {
         "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_sync_state?source_key=eq.shopify_orders&select=source_key,cursor_updated_at,last_success_at,metadata",
         "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
+        "genericAuthType": "httpCustomAuth",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -76,6 +76,7 @@
       "name": "Read Orders Checkpoint [CREDENTIAL REQUIRED]",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
+      "alwaysOutputData": true,
       "position": [
         -680,
         100
@@ -84,9 +85,9 @@
       "maxTries": 3,
       "waitBetweenTries": 2000,
       "credentials": {
-        "httpHeaderAuth": {
-          "id": "FB_SUPABASE_SECRET_REQUIRED",
-          "name": "Flavour Blaster Supabase Secret [REQUIRED]"
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
         }
       }
     },
@@ -112,7 +113,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ query: `query DashboardOrders($query: String!, $after: String) { orders(first: 100, after: $after, sortKey: UPDATED_AT, query: $query) { pageInfo { hasNextPage endCursor } nodes { id legacyResourceId name createdAt processedAt updatedAt cancelledAt displayFinancialStatus displayFulfillmentStatus test tags currentSubtotalPriceSet { shopMoney { amount currencyCode } } currentTotalDiscountsSet { shopMoney { amount currencyCode } } currentTotalPriceSet { shopMoney { amount currencyCode } } currentTotalTaxSet { shopMoney { amount currencyCode } } totalRefundedSet { shopMoney { amount currencyCode } } customer { id legacyResourceId displayName numberOfOrders } billingAddress { countryCodeV2 } shippingAddress { countryCodeV2 } lineItems(first: 100) { nodes { id legacyResourceId name title variantTitle sku quantity currentQuantity originalTotalSet { shopMoney { amount currencyCode } } discountedTotalSet { shopMoney { amount currencyCode } } variant { id legacyResourceId product { id legacyResourceId } } } } } } }`, variables: { query: `updated_at:>=${$json.start} updated_at:<=${$json.end}`, after: $json.after } }) }}",
+        "body": "={{ JSON.stringify({ query: `query DashboardOrders($query: String!, $after: String) { orders(first: 100, after: $after, sortKey: UPDATED_AT, query: $query) { pageInfo { hasNextPage endCursor } nodes { id legacyResourceId name createdAt processedAt updatedAt cancelledAt displayFinancialStatus displayFulfillmentStatus test tags currentSubtotalPriceSet { shopMoney { amount currencyCode } } currentTotalDiscountsSet { shopMoney { amount currencyCode } } currentTotalPriceSet { shopMoney { amount currencyCode } } currentTotalTaxSet { shopMoney { amount currencyCode } } totalRefundedSet { shopMoney { amount currencyCode } } customer { id legacyResourceId displayName numberOfOrders } billingAddress { countryCodeV2 } shippingAddress { countryCodeV2 } lineItems(first: 100) { nodes { id name title variantTitle sku quantity currentQuantity originalTotalSet { shopMoney { amount currencyCode } } discountedTotalSet { shopMoney { amount currencyCode } } variant { id legacyResourceId product { id legacyResourceId } } } } } } }`, variables: { query: `updated_at:>=${$json.start} updated_at:<=${$json.end}`, after: $json.after } }) }}",
         "options": {
           "timeout": 120000
         }
@@ -168,7 +169,7 @@
         "method": "POST",
         "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_orders?on_conflict=shopify_order_id",
         "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
+        "genericAuthType": "httpCustomAuth",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -185,7 +186,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify($('Normalize Orders, Lines and Customers').item.json.orders) }}",
+        "body": "={{ JSON.stringify($('Normalize Orders, Lines and Customers').item.json.orders.map(({ raw, tax_total, ...order }) => ({ ...order, taxes: tax_total }))) }}",
         "options": {
           "timeout": 120000
         }
@@ -203,9 +204,9 @@
       "maxTries": 3,
       "waitBetweenTries": 2000,
       "credentials": {
-        "httpHeaderAuth": {
-          "id": "FB_SUPABASE_SECRET_REQUIRED",
-          "name": "Flavour Blaster Supabase Secret [REQUIRED]"
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
         }
       }
     },
@@ -214,7 +215,7 @@
         "method": "POST",
         "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_order_lines?on_conflict=shopify_line_item_id",
         "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
+        "genericAuthType": "httpCustomAuth",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -231,7 +232,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify($('Normalize Orders, Lines and Customers').item.json.lines) }}",
+        "body": "={{ JSON.stringify($('Normalize Orders, Lines and Customers').item.json.lines.map(({ raw, ...line }) => line)) }}",
         "options": {
           "timeout": 120000
         }
@@ -249,9 +250,9 @@
       "maxTries": 3,
       "waitBetweenTries": 2000,
       "credentials": {
-        "httpHeaderAuth": {
-          "id": "FB_SUPABASE_SECRET_REQUIRED",
-          "name": "Flavour Blaster Supabase Secret [REQUIRED]"
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
         }
       }
     },
@@ -260,7 +261,7 @@
         "method": "POST",
         "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_customers?on_conflict=shopify_customer_id",
         "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
+        "genericAuthType": "httpCustomAuth",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -277,7 +278,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify($('Normalize Orders, Lines and Customers').item.json.customers) }}",
+        "body": "={{ JSON.stringify($('Normalize Orders, Lines and Customers').item.json.customers.map(({ raw, email, ...customer }) => customer)) }}",
         "options": {
           "timeout": 120000
         }
@@ -295,9 +296,9 @@
       "maxTries": 3,
       "waitBetweenTries": 2000,
       "credentials": {
-        "httpHeaderAuth": {
-          "id": "FB_SUPABASE_SECRET_REQUIRED",
-          "name": "Flavour Blaster Supabase Secret [REQUIRED]"
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
         }
       }
     },
@@ -367,7 +368,7 @@
         "method": "POST",
         "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_sync_state?on_conflict=source_key",
         "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
+        "genericAuthType": "httpCustomAuth",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -402,9 +403,9 @@
       "maxTries": 3,
       "waitBetweenTries": 2000,
       "credentials": {
-        "httpHeaderAuth": {
-          "id": "FB_SUPABASE_SECRET_REQUIRED",
-          "name": "Flavour Blaster Supabase Secret [REQUIRED]"
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
         }
       }
     }

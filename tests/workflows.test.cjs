@@ -20,13 +20,13 @@ test('all committed n8n workflows are disabled behind a closed gate', () => {
   }
 });
 
-test('Shopify writes are impossible without the unresolved Supabase credential', () => {
+test('Shopify writes are impossible without the unresolved Supabase server credential', () => {
   for (const file of files.filter((name) => !name.includes('health'))) {
     const workflow = JSON.parse(fs.readFileSync(path.join(workflowDir, file), 'utf8'));
     const writes = workflow.nodes.filter((node) => node.name.startsWith('Supabase Upsert'));
     assert.ok(writes.length > 0, file);
     for (const node of writes) {
-      assert.equal(node.credentials.httpHeaderAuth.id, 'FB_SUPABASE_SECRET_REQUIRED', node.name);
+      assert.equal(node.credentials.httpCustomAuth.id, 'FB_SUPABASE_CUSTOM_REQUIRED', node.name);
     }
   }
 });
@@ -57,7 +57,7 @@ test('data workflows enforce bounded cursor pagination, retries, throttling and 
     assert.equal(pause.parameters.amount, 1, file);
     assert.ok(checkpoint, file);
     assert.match(checkpoint.parameters.body, /last_success_at/);
-    assert.equal(checkpoint.credentials.httpHeaderAuth.id, 'FB_SUPABASE_SECRET_REQUIRED', file);
+    assert.equal(checkpoint.credentials.httpCustomAuth.id, 'FB_SUPABASE_CUSTOM_REQUIRED', file);
 
     const checkpointParents = Object.entries(workflow.connections)
       .filter(([, outputs]) => JSON.stringify(outputs).includes(checkpoint.name))
