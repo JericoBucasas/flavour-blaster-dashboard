@@ -42,3 +42,17 @@ test('Shopify rows map to dashboard channels, regions, and net sales', () => {
   assert.equal(result.days[0].reg.other.s, 80);
   assert.equal(result.days[0].hw[14], 1);
 });
+
+test('live loader scopes the request to the active dashboard section', async () => {
+  let requestedUrl = '';
+  const context = {
+    window:{}, Map, Number, Date, Array, String, Object, encodeURIComponent,
+    fetch:async (url) => {
+      requestedUrl = url;
+      return { ok:true, json:async () => ({ status:'live', data:{ daily:[] } }) };
+    },
+  };
+  vm.runInNewContext(fs.readFileSync('dashboard-live.js', 'utf8'), context);
+  await context.window.FlavourBlasterLive.load('/api/dashboard', '2026-08-19', '2026-08-20', 'orders');
+  assert.equal(requestedUrl, '/api/dashboard?start=2026-08-19&end=2026-08-20&section=orders');
+});

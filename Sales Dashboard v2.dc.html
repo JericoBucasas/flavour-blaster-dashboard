@@ -1440,6 +1440,14 @@ class Component extends DCLogic {
     window.addEventListener('keydown', this._keys);
     this.loadLiveData();
   }
+  componentDidUpdate(_prevProps, prevState) {
+    const viewChanged = prevState.view !== this.state.view || prevState.continuous !== this.state.continuous;
+    if (!viewChanged || this.state.dataStatus === 'loading') return;
+    const needsProducts = this.state.view === 'products' && !this.state.livePayload?.productCatalog;
+    const needsCustomers = this.state.view === 'customers' && !this.state.livePayload?.customerDirectory;
+    const needsAll = this.state.continuous && (!this.state.livePayload?.productCatalog || !this.state.livePayload?.customerDirectory);
+    if (needsProducts || needsCustomers || needsAll) this.loadLiveData();
+  }
   componentWillUnmount() { window.removeEventListener('keydown', this._keys); }
   async loadLiveData() {
     if (!window.FlavourBlasterLive) {
@@ -1449,7 +1457,9 @@ class Component extends DCLogic {
     this.setState({ dataStatus:'loading', dataError:null });
     try {
       const end = new Date(this.NOW).toISOString().slice(0, 10);
-      const payload = await window.FlavourBlasterLive.load('/api/dashboard', '2025-01-01', end);
+      const section = this.state.continuous ? 'all' : this.state.view;
+      const loadedPayload = await window.FlavourBlasterLive.load('/api/dashboard', '2025-01-01', end, section);
+      const payload = { ...(this.state.livePayload || {}), ...loadedPayload };
       const normalized = window.FlavourBlasterLive.normalize(payload, this.CH, this.RG);
       if (!normalized.hasLiveData) {
         this.setState({ dataStatus:'empty', livePayload:payload, dataUpdatedAt:payload.sourceLastUpdatedAt || payload.generatedAt || null,

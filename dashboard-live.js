@@ -75,8 +75,9 @@
     return { hasLiveData:true, days:days, payload:payload };
   }
 
-  async function load(endpoint, start, end) {
+  async function load(endpoint, start, end, section) {
     var url = endpoint + '?start=' + encodeURIComponent(start) + '&end=' + encodeURIComponent(end);
+    if (section) url += '&section=' + encodeURIComponent(section);
     var response = await fetch(url, { headers:{ Accept:'application/json' }, credentials:'same-origin' });
     var body = await response.json().catch(function () { return null; });
     if (!response.ok || !body || body.status !== 'live') throw new Error(body && body.code || 'LIVE_DATA_UNAVAILABLE');
