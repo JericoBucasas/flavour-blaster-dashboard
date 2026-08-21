@@ -55,6 +55,8 @@ test('Shopify sales events are incremental, idempotent, and contain no customer 
   assert.match(shopify.parameters.body, /sales\(first: 50\)/);
   assert.doesNotMatch(shopify.parameters.body, /customer|email|phone|billingAddress|shippingAddress/);
   assert.match(normalize.parameters.jsCode, /shopify_sale_id/);
+  assert.match(normalize.parameters.jsCode, /eventStart = Date\.parse/);
+  assert.match(normalize.parameters.jsCode, /happenedMs < eventStart \|\| happenedMs >= eventEnd/);
   assert.match(upsert.parameters.url, /fb_sales_events\?on_conflict=shopify_sale_id/);
   assert.equal(upsert.credentials.httpCustomAuth.id, 'FB_SUPABASE_CUSTOM_REQUIRED');
   assert.match(checkpoint.parameters.body, /idempotency_key:'shopify_sale_id'/);
