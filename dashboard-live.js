@@ -1,7 +1,7 @@
 (function (root) {
   'use strict';
 
-  var CHANNEL_MAP = { shopify_d2c: 'd2c', shopify_b2b: 'b2b' };
+  var CHANNEL_MAP = { shopify_d2c: 'd2c', shopify_b2b: 'b2b', amazon_us: 'amzus', amazon_uk: 'amzuk' };
   var REGION_MAP = { us: 'us', eur: 'eur', gb: 'gb', aus: 'aus', other: 'other' };
 
   function number(value) {
@@ -85,4 +85,3 @@
 
   root.FlavourBlasterLive = { load:load, normalize:normalize };
 })(window);
-

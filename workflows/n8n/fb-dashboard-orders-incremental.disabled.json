@@ -1,9 +1,9 @@
 {
-  "name": "FB Dashboard | Orders Incremental to Supabase [DISABLED]",
+  "name": "FB Dashboard | Orders Multi-Store Incremental to Supabase [DISABLED]",
   "nodes": [
     {
       "parameters": {
-        "content": "## CONTROLLED RELEASE SAFETY\nInactive template with a closed code gate. The first approved run is limited to a rolling 7-day order window, 100 orders per page and 50 pages. Every Shopify and Supabase request retries up to three times. A one-second pause is applied between Shopify pages. The checkpoint advances only after every page has been written successfully. Never widen the window or page ceiling without a separate review.",
+        "content": "## CONTROLLED MULTI-STORE ORDER SYNC\nOne controlled initial import starts at 2025-01-01. Later runs use a separate successful checkpoint for each store, subtract a ten-minute overlap, and request only orders updated inside that bounded window. Amazon branches query orders and line items only: no customer, email, phone or address fields. Checkpoints advance only after every page has been written successfully.",
         "height": 300,
         "width": 560,
         "color": 5
@@ -22,14 +22,14 @@
         "rule": {
           "interval": [
             {
-              "field": "hours",
-              "hoursInterval": 1
+              "field": "cronExpression",
+              "expression": "0 0 */6 * * *"
             }
           ]
         }
       },
       "id": "orders-schedule",
-      "name": "Schedule - Every Hour (Inactive)",
+      "name": "Schedule - Every 6 Hours (London)",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
@@ -408,25 +408,650 @@
           "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
         }
       }
+    },
+    {
+      "parameters": {
+        "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_sync_state?source_key=eq.shopify_orders_amazon_us&select=source_key,cursor_updated_at,last_success_at,metadata",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "User-Agent",
+              "value": "FlavourBlasterDashboard-n8n/1.0"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "orders-read-checkpoint",
+      "name": "Amazon US | Read Checkpoint [CREDENTIAL REQUIRED]",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "alwaysOutputData": true,
+      "position": [
+        20,
+        980
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\nconst sourceKey = 'shopify_orders_amazon_us';\nconst checkpoint = rows.find(r => r && r.source_key === sourceKey) || null;\nconst historicalFloor = new Date('2025-01-01T00:00:00.000Z');\nconst end = new Date();\nconst saved = checkpoint?.cursor_updated_at ? new Date(checkpoint.cursor_updated_at) : null;\nconst overlap = saved && !Number.isNaN(saved.getTime()) ? new Date(saved.getTime() - 10 * 60000) : historicalFloor;\nconst start = overlap > historicalFloor ? overlap : historicalFloor;\nreturn [{ json: { sourceKey, sourceStore:'flavour-blaster-amazon-us', channel:'amazon_us', regionCode:'us', fxRateToUsd:1, start:start.toISOString(), end:end.toISOString(), after:null, page:1, maxPages:500, pagesRead:0, ordersRead:0, linesRead:0 } }];"
+      },
+      "id": "orders-window",
+      "name": "Amazon US | Build Incremental Window",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        980
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://flavour-blaster-amazon-us.myshopify.com/admin/api/2026-07/graphql.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ query: `query AmazonDashboardOrders($query: String!, $after: String) { orders(first: 100, after: $after, sortKey: UPDATED_AT, query: $query) { pageInfo { hasNextPage endCursor } nodes { id legacyResourceId name createdAt processedAt updatedAt cancelledAt closedAt displayFinancialStatus displayFulfillmentStatus test tags currentSubtotalPriceSet { shopMoney { amount currencyCode } } currentTotalDiscountsSet { shopMoney { amount currencyCode } } currentTotalPriceSet { shopMoney { amount currencyCode } } currentTotalTaxSet { shopMoney { amount currencyCode } } totalRefundedSet { shopMoney { amount currencyCode } } lineItems(first: 100) { nodes { id name title variantTitle sku quantity currentQuantity originalTotalSet { shopMoney { amount currencyCode } } discountedTotalSet { shopMoney { amount currencyCode } } variant { id legacyResourceId product { id legacyResourceId } } } } } } }`, variables: { query: `created_at:>=2025-01-01 updated_at:>=${$json.start} updated_at:<=${$json.end}`, after: $json.after } }) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "orders-shopify",
+      "name": "Amazon US | Shopify Orders Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        500,
+        900
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "FB_AMAZON_US_SHOPIFY_OAUTH_REQUIRED",
+          "name": "Flavour Blaster Amazon US OAuth2 [REQUIRED]"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "orders-merge",
+      "name": "Amazon US | Merge State and Response",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        730,
+        980
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $json.data?.orders;\nif (!response || !response.pageInfo || !Array.isArray(response.nodes)) throw new Error('AMAZON_ORDERS_RESPONSE_INVALID');\nconst numericId = gid => Number(String(gid || '').split('/').pop()) || null;\nconst orders = []; const lines = [];\nfor (const o of response.nodes) {\n  const orderId = Number(o.legacyResourceId);\n  if (!Number.isSafeInteger(orderId)) throw new Error('AMAZON_ORDER_ID_INVALID');\n  const subtotal = Number(o.currentSubtotalPriceSet?.shopMoney?.amount || 0);\n  const total = Number(o.currentTotalPriceSet?.shopMoney?.amount || 0);\n  const discounts = Number(o.currentTotalDiscountsSet?.shopMoney?.amount || 0);\n  const refunds = Number(o.totalRefundedSet?.shopMoney?.amount || 0);\n  const orderLines = o.lineItems?.nodes || [];\n  orders.push({ shopify_order_id:orderId, order_name:o.name, source_store:$json.sourceStore, channel:$json.channel, processed_at:o.processedAt || o.createdAt, shopify_created_at:o.createdAt, shopify_updated_at:o.updatedAt, cancelled_at:o.cancelledAt, closed_at:o.closedAt, customer_id:null, customer_display_name:null, region_code:$json.regionCode, currency_code:o.currentTotalPriceSet?.shopMoney?.currencyCode || 'USD', reporting_currency_code:'USD', fx_rate_to_usd:Number($json.fxRateToUsd), financial_status:String(o.displayFinancialStatus || '').toLowerCase(), fulfillment_status:String(o.displayFulfillmentStatus || '').toLowerCase(), tags:o.tags || [], total_line_items:orderLines.length, total_quantity:orderLines.reduce((s,l)=>s+Number(l.currentQuantity || 0),0), gross_sales:subtotal + discounts, discounts, refunds, net_sales:Math.max(0, subtotal - refunds), total_sales:total, taxes:Number(o.currentTotalTaxSet?.shopMoney?.amount || 0), is_test:Boolean(o.test) });\n  for (const l of orderLines) {\n    const lineId = numericId(l.id);\n    if (!Number.isSafeInteger(lineId)) throw new Error('AMAZON_LINE_ITEM_ID_INVALID');\n    const gross = Number(l.originalTotalSet?.shopMoney?.amount || 0);\n    const net = Number(l.discountedTotalSet?.shopMoney?.amount || 0);\n    lines.push({ shopify_line_item_id:lineId, shopify_order_id:orderId, source_store:$json.sourceStore, shopify_product_id:Number(l.variant?.product?.legacyResourceId) || numericId(l.variant?.product?.id), shopify_variant_id:Number(l.variant?.legacyResourceId) || numericId(l.variant?.id), sku:l.sku || null, title:l.title || l.name || 'Amazon item', variant_title:l.variantTitle || null, quantity:Number(l.quantity || 0), refunded_quantity:Math.max(0, Number(l.quantity || 0) - Number(l.currentQuantity || 0)), gross_sales:gross, discounts:Math.max(0, gross - net), refunds:0, net_sales:net, fx_rate_to_usd:Number($json.fxRateToUsd) });\n  }\n}\nreturn [{ json:{ sourceKey:$json.sourceKey, sourceStore:$json.sourceStore, channel:$json.channel, regionCode:$json.regionCode, fxRateToUsd:$json.fxRateToUsd, start:$json.start, end:$json.end, after:$json.after, page:Number($json.page), maxPages:Number($json.maxPages), pagesRead:Number($json.pagesRead || 0), ordersRead:Number($json.ordersRead || 0), linesRead:Number($json.linesRead || 0), orders, lines, pageInfo:response.pageInfo } }];"
+      },
+      "id": "orders-normalize",
+      "name": "Amazon US | Normalize Orders and Lines",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        980
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_orders?on_conflict=shopify_order_id",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=minimal"
+            },
+            {
+              "name": "User-Agent",
+              "value": "FlavourBlasterDashboard-n8n/1.0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($('Amazon US | Normalize Orders and Lines').item.json.orders) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "orders-upsert",
+      "name": "Amazon US | Upsert Orders [CREDENTIAL REQUIRED]",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        980
+      ],
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_order_lines?on_conflict=shopify_line_item_id",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=minimal"
+            },
+            {
+              "name": "User-Agent",
+              "value": "FlavourBlasterDashboard-n8n/1.0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($('Amazon US | Normalize Orders and Lines').item.json.lines) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "lines-upsert",
+      "name": "Amazon US | Upsert Lines [CREDENTIAL REQUIRED]",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        980
+      ],
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $('Amazon US | Normalize Orders and Lines').item.json;\nconst pagesRead = b.pagesRead + 1;\nconst hasNextPage = Boolean(b.pageInfo?.hasNextPage);\nif (hasNextPage && pagesRead >= b.maxPages) throw new Error(`AMAZON_ORDERS_PAGE_LIMIT_REACHED:${b.maxPages}`);\nif (hasNextPage && !b.pageInfo?.endCursor) throw new Error('AMAZON_ORDERS_CURSOR_MISSING');\nreturn [{ json:{ sourceKey:b.sourceKey, sourceStore:b.sourceStore, channel:b.channel, regionCode:b.regionCode, fxRateToUsd:b.fxRateToUsd, start:b.start, end:b.end, after:hasNextPage ? b.pageInfo.endCursor : null, page:b.page + 1, maxPages:b.maxPages, pagesRead, ordersRead:b.ordersRead + b.orders.length, linesRead:b.linesRead + b.lines.length, continue:hasNextPage } }];"
+      },
+      "id": "orders-advance",
+      "name": "Amazon US | Advance Cursor After Writes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        980
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "orders-has-next",
+              "leftValue": "={{ $json.continue }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "orders-if",
+      "name": "Amazon US | More Pages?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1910,
+        980
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 1
+      },
+      "id": "orders-wait",
+      "name": "Amazon US | Rate Limit Pause",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2140,
+        900
+      ],
+      "webhookId": "fb-orders-rate-limit-pause"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_sync_state?on_conflict=source_key",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=minimal"
+            },
+            {
+              "name": "User-Agent",
+              "value": "FlavourBlasterDashboard-n8n/1.0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ source_key:$json.sourceKey, cursor_updated_at:$json.end, last_success_at:new Date().toISOString(), metadata:{ source_store:$json.sourceStore, channel:$json.channel, window_start:$json.start, window_end:$json.end, pages_read:$json.pagesRead, orders_read:$json.ordersRead, lines_read:$json.linesRead, historical_floor:'2025-01-01T00:00:00.000Z', overlap_minutes:10, schedule_hours:6, schedule_timezone:'Europe/London', max_pages:$json.maxPages } }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "orders-checkpoint",
+      "name": "Amazon US | Upsert Success Checkpoint [CREDENTIAL REQUIRED]",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2140,
+        1060
+      ],
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_sync_state?source_key=eq.shopify_orders_amazon_uk&select=source_key,cursor_updated_at,last_success_at,metadata",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "User-Agent",
+              "value": "FlavourBlasterDashboard-n8n/1.0"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "orders-read-checkpoint",
+      "name": "Amazon UK | Read Checkpoint [CREDENTIAL REQUIRED]",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "alwaysOutputData": true,
+      "position": [
+        20,
+        1540
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\nconst sourceKey = 'shopify_orders_amazon_uk';\nconst checkpoint = rows.find(r => r && r.source_key === sourceKey) || null;\nconst historicalFloor = new Date('2025-01-01T00:00:00.000Z');\nconst end = new Date();\nconst saved = checkpoint?.cursor_updated_at ? new Date(checkpoint.cursor_updated_at) : null;\nconst overlap = saved && !Number.isNaN(saved.getTime()) ? new Date(saved.getTime() - 10 * 60000) : historicalFloor;\nconst start = overlap > historicalFloor ? overlap : historicalFloor;\nreturn [{ json: { sourceKey, sourceStore:'flavour-blaster-amazon-uk', channel:'amazon_uk', regionCode:'gb', fxRateToUsd:1.26582278, start:start.toISOString(), end:end.toISOString(), after:null, page:1, maxPages:250, pagesRead:0, ordersRead:0, linesRead:0 } }];"
+      },
+      "id": "orders-window",
+      "name": "Amazon UK | Build Incremental Window",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        1540
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://flavour-blaster-amazon-uk.myshopify.com/admin/api/2026-07/graphql.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ query: `query AmazonDashboardOrders($query: String!, $after: String) { orders(first: 100, after: $after, sortKey: UPDATED_AT, query: $query) { pageInfo { hasNextPage endCursor } nodes { id legacyResourceId name createdAt processedAt updatedAt cancelledAt closedAt displayFinancialStatus displayFulfillmentStatus test tags currentSubtotalPriceSet { shopMoney { amount currencyCode } } currentTotalDiscountsSet { shopMoney { amount currencyCode } } currentTotalPriceSet { shopMoney { amount currencyCode } } currentTotalTaxSet { shopMoney { amount currencyCode } } totalRefundedSet { shopMoney { amount currencyCode } } lineItems(first: 100) { nodes { id name title variantTitle sku quantity currentQuantity originalTotalSet { shopMoney { amount currencyCode } } discountedTotalSet { shopMoney { amount currencyCode } } variant { id legacyResourceId product { id legacyResourceId } } } } } } }`, variables: { query: `created_at:>=2025-01-01 updated_at:>=${$json.start} updated_at:<=${$json.end}`, after: $json.after } }) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "orders-shopify",
+      "name": "Amazon UK | Shopify Orders Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        500,
+        1460
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "FB_AMAZON_UK_SHOPIFY_OAUTH_REQUIRED",
+          "name": "Flavour Blaster Amazon UK OAuth2 [REQUIRED]"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "orders-merge",
+      "name": "Amazon UK | Merge State and Response",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        730,
+        1540
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $json.data?.orders;\nif (!response || !response.pageInfo || !Array.isArray(response.nodes)) throw new Error('AMAZON_ORDERS_RESPONSE_INVALID');\nconst numericId = gid => Number(String(gid || '').split('/').pop()) || null;\nconst orders = []; const lines = [];\nfor (const o of response.nodes) {\n  const orderId = Number(o.legacyResourceId);\n  if (!Number.isSafeInteger(orderId)) throw new Error('AMAZON_ORDER_ID_INVALID');\n  const subtotal = Number(o.currentSubtotalPriceSet?.shopMoney?.amount || 0);\n  const total = Number(o.currentTotalPriceSet?.shopMoney?.amount || 0);\n  const discounts = Number(o.currentTotalDiscountsSet?.shopMoney?.amount || 0);\n  const refunds = Number(o.totalRefundedSet?.shopMoney?.amount || 0);\n  const orderLines = o.lineItems?.nodes || [];\n  orders.push({ shopify_order_id:orderId, order_name:o.name, source_store:$json.sourceStore, channel:$json.channel, processed_at:o.processedAt || o.createdAt, shopify_created_at:o.createdAt, shopify_updated_at:o.updatedAt, cancelled_at:o.cancelledAt, closed_at:o.closedAt, customer_id:null, customer_display_name:null, region_code:$json.regionCode, currency_code:o.currentTotalPriceSet?.shopMoney?.currencyCode || 'GBP', reporting_currency_code:'USD', fx_rate_to_usd:Number($json.fxRateToUsd), financial_status:String(o.displayFinancialStatus || '').toLowerCase(), fulfillment_status:String(o.displayFulfillmentStatus || '').toLowerCase(), tags:o.tags || [], total_line_items:orderLines.length, total_quantity:orderLines.reduce((s,l)=>s+Number(l.currentQuantity || 0),0), gross_sales:subtotal + discounts, discounts, refunds, net_sales:Math.max(0, subtotal - refunds), total_sales:total, taxes:Number(o.currentTotalTaxSet?.shopMoney?.amount || 0), is_test:Boolean(o.test) });\n  for (const l of orderLines) {\n    const lineId = numericId(l.id);\n    if (!Number.isSafeInteger(lineId)) throw new Error('AMAZON_LINE_ITEM_ID_INVALID');\n    const gross = Number(l.originalTotalSet?.shopMoney?.amount || 0);\n    const net = Number(l.discountedTotalSet?.shopMoney?.amount || 0);\n    lines.push({ shopify_line_item_id:lineId, shopify_order_id:orderId, source_store:$json.sourceStore, shopify_product_id:Number(l.variant?.product?.legacyResourceId) || numericId(l.variant?.product?.id), shopify_variant_id:Number(l.variant?.legacyResourceId) || numericId(l.variant?.id), sku:l.sku || null, title:l.title || l.name || 'Amazon item', variant_title:l.variantTitle || null, quantity:Number(l.quantity || 0), refunded_quantity:Math.max(0, Number(l.quantity || 0) - Number(l.currentQuantity || 0)), gross_sales:gross, discounts:Math.max(0, gross - net), refunds:0, net_sales:net, fx_rate_to_usd:Number($json.fxRateToUsd) });\n  }\n}\nreturn [{ json:{ sourceKey:$json.sourceKey, sourceStore:$json.sourceStore, channel:$json.channel, regionCode:$json.regionCode, fxRateToUsd:$json.fxRateToUsd, start:$json.start, end:$json.end, after:$json.after, page:Number($json.page), maxPages:Number($json.maxPages), pagesRead:Number($json.pagesRead || 0), ordersRead:Number($json.ordersRead || 0), linesRead:Number($json.linesRead || 0), orders, lines, pageInfo:response.pageInfo } }];"
+      },
+      "id": "orders-normalize",
+      "name": "Amazon UK | Normalize Orders and Lines",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        1540
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_orders?on_conflict=shopify_order_id",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=minimal"
+            },
+            {
+              "name": "User-Agent",
+              "value": "FlavourBlasterDashboard-n8n/1.0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($('Amazon UK | Normalize Orders and Lines').item.json.orders) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "orders-upsert",
+      "name": "Amazon UK | Upsert Orders [CREDENTIAL REQUIRED]",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        1540
+      ],
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_order_lines?on_conflict=shopify_line_item_id",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=minimal"
+            },
+            {
+              "name": "User-Agent",
+              "value": "FlavourBlasterDashboard-n8n/1.0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($('Amazon UK | Normalize Orders and Lines').item.json.lines) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "lines-upsert",
+      "name": "Amazon UK | Upsert Lines [CREDENTIAL REQUIRED]",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        1540
+      ],
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $('Amazon UK | Normalize Orders and Lines').item.json;\nconst pagesRead = b.pagesRead + 1;\nconst hasNextPage = Boolean(b.pageInfo?.hasNextPage);\nif (hasNextPage && pagesRead >= b.maxPages) throw new Error(`AMAZON_ORDERS_PAGE_LIMIT_REACHED:${b.maxPages}`);\nif (hasNextPage && !b.pageInfo?.endCursor) throw new Error('AMAZON_ORDERS_CURSOR_MISSING');\nreturn [{ json:{ sourceKey:b.sourceKey, sourceStore:b.sourceStore, channel:b.channel, regionCode:b.regionCode, fxRateToUsd:b.fxRateToUsd, start:b.start, end:b.end, after:hasNextPage ? b.pageInfo.endCursor : null, page:b.page + 1, maxPages:b.maxPages, pagesRead, ordersRead:b.ordersRead + b.orders.length, linesRead:b.linesRead + b.lines.length, continue:hasNextPage } }];"
+      },
+      "id": "orders-advance",
+      "name": "Amazon UK | Advance Cursor After Writes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        1540
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "orders-has-next",
+              "leftValue": "={{ $json.continue }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "orders-if",
+      "name": "Amazon UK | More Pages?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1910,
+        1540
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 1
+      },
+      "id": "orders-wait",
+      "name": "Amazon UK | Rate Limit Pause",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2140,
+        1460
+      ],
+      "webhookId": "fb-orders-rate-limit-pause"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_sync_state?on_conflict=source_key",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=minimal"
+            },
+            {
+              "name": "User-Agent",
+              "value": "FlavourBlasterDashboard-n8n/1.0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ source_key:$json.sourceKey, cursor_updated_at:$json.end, last_success_at:new Date().toISOString(), metadata:{ source_store:$json.sourceStore, channel:$json.channel, window_start:$json.start, window_end:$json.end, pages_read:$json.pagesRead, orders_read:$json.ordersRead, lines_read:$json.linesRead, historical_floor:'2025-01-01T00:00:00.000Z', overlap_minutes:10, schedule_hours:6, schedule_timezone:'Europe/London', max_pages:$json.maxPages } }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "orders-checkpoint",
+      "name": "Amazon UK | Upsert Success Checkpoint [CREDENTIAL REQUIRED]",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2140,
+        1620
+      ],
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
+        }
+      }
     }
   ],
   "connections": {
-    "Schedule - Every Hour (Inactive)": {
-      "main": [
-        [
-          {
-            "node": "Closed Development Gate",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Closed Development Gate": {
       "main": [
         [
           {
             "node": "Read Orders Checkpoint [CREDENTIAL REQUIRED]",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Amazon US | Read Checkpoint [CREDENTIAL REQUIRED]",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Amazon UK | Read Checkpoint [CREDENTIAL REQUIRED]",
             "type": "main",
             "index": 0
           }
@@ -570,6 +1195,271 @@
           }
         ]
       ]
+    },
+    "Schedule - Every 6 Hours (London)": {
+      "main": [
+        [
+          {
+            "node": "Closed Development Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Amazon US | Read Checkpoint [CREDENTIAL REQUIRED]": {
+      "main": [
+        [
+          {
+            "node": "Amazon US | Build Incremental Window",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Amazon US | Build Incremental Window": {
+      "main": [
+        [
+          {
+            "node": "Amazon US | Shopify Orders Page",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Amazon US | Merge State and Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Amazon US | Shopify Orders Page": {
+      "main": [
+        [
+          {
+            "node": "Amazon US | Merge State and Response",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Amazon US | Merge State and Response": {
+      "main": [
+        [
+          {
+            "node": "Amazon US | Normalize Orders and Lines",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Amazon US | Normalize Orders and Lines": {
+      "main": [
+        [
+          {
+            "node": "Amazon US | Upsert Orders [CREDENTIAL REQUIRED]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Amazon US | Upsert Orders [CREDENTIAL REQUIRED]": {
+      "main": [
+        [
+          {
+            "node": "Amazon US | Upsert Lines [CREDENTIAL REQUIRED]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Amazon US | Upsert Lines [CREDENTIAL REQUIRED]": {
+      "main": [
+        [
+          {
+            "node": "Amazon US | Advance Cursor After Writes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Amazon US | Advance Cursor After Writes": {
+      "main": [
+        [
+          {
+            "node": "Amazon US | More Pages?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Amazon US | More Pages?": {
+      "main": [
+        [
+          {
+            "node": "Amazon US | Rate Limit Pause",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Amazon US | Upsert Success Checkpoint [CREDENTIAL REQUIRED]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Amazon US | Rate Limit Pause": {
+      "main": [
+        [
+          {
+            "node": "Amazon US | Shopify Orders Page",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Amazon US | Merge State and Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Amazon UK | Read Checkpoint [CREDENTIAL REQUIRED]": {
+      "main": [
+        [
+          {
+            "node": "Amazon UK | Build Incremental Window",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Amazon UK | Build Incremental Window": {
+      "main": [
+        [
+          {
+            "node": "Amazon UK | Shopify Orders Page",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Amazon UK | Merge State and Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Amazon UK | Shopify Orders Page": {
+      "main": [
+        [
+          {
+            "node": "Amazon UK | Merge State and Response",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Amazon UK | Merge State and Response": {
+      "main": [
+        [
+          {
+            "node": "Amazon UK | Normalize Orders and Lines",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Amazon UK | Normalize Orders and Lines": {
+      "main": [
+        [
+          {
+            "node": "Amazon UK | Upsert Orders [CREDENTIAL REQUIRED]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Amazon UK | Upsert Orders [CREDENTIAL REQUIRED]": {
+      "main": [
+        [
+          {
+            "node": "Amazon UK | Upsert Lines [CREDENTIAL REQUIRED]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Amazon UK | Upsert Lines [CREDENTIAL REQUIRED]": {
+      "main": [
+        [
+          {
+            "node": "Amazon UK | Advance Cursor After Writes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Amazon UK | Advance Cursor After Writes": {
+      "main": [
+        [
+          {
+            "node": "Amazon UK | More Pages?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Amazon UK | More Pages?": {
+      "main": [
+        [
+          {
+            "node": "Amazon UK | Rate Limit Pause",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Amazon UK | Upsert Success Checkpoint [CREDENTIAL REQUIRED]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Amazon UK | Rate Limit Pause": {
+      "main": [
+        [
+          {
+            "node": "Amazon UK | Shopify Orders Page",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Amazon UK | Merge State and Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -577,11 +1467,21 @@
     "executionOrder": "v1",
     "saveManualExecutions": true,
     "callerPolicy": "workflowsFromSameOwner",
-    "executionTimeout": 900
+    "executionTimeout": 1800,
+    "timezone": "Europe/London"
   },
-  "versionId": "fb-dashboard-orders-development-v2",
+  "versionId": "fb-dashboard-orders-multistore-development-v3",
   "meta": {
-    "templateCredsSetupCompleted": false
+    "templateCredsSetupCompleted": false,
+    "targetFolderId": "BafBm52YFWfYw7sU",
+    "scheduleTimezone": "Europe/London",
+    "historicalFloor": "2025-01-01T00:00:00.000Z",
+    "incrementalOverlapMinutes": 10,
+    "sources": [
+      "jetchill-mixology",
+      "flavour-blaster-amazon-us",
+      "flavour-blaster-amazon-uk"
+    ]
   },
   "tags": []
 }

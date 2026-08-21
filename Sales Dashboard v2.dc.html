@@ -1457,10 +1457,10 @@ class Component extends DCLogic {
         return;
       }
       this.days = normalized.days;
-      const baseCurrency = payload.recentOrders?.find(order => order.currency_code)?.currency_code || 'USD';
+      const baseCurrency = payload.reportingCurrencyCode || 'USD';
       this.setState({ dataStatus:'live', livePayload:payload, dataUpdatedAt:payload.sync?.last_success_at || payload.sourceLastUpdatedAt || payload.generatedAt || null,
         dataCoverageStart:payload.coverageStart || null, dataCoverageEnd:payload.coverageEnd || null, dataBaseCurrency:baseCurrency,
-        chOn:{ ...this.state.chOn, d2c:true, b2b:true, amzus:false, amzuk:false } });
+        chOn:{ ...this.state.chOn, d2c:true, b2b:true, amzus:true, amzuk:true } });
     } catch (error) {
       this.setState({ dataStatus:'error', dataError:error && error.message ? error.message : 'LIVE_DATA_UNAVAILABLE' });
     }
@@ -2080,7 +2080,8 @@ class Component extends DCLogic {
     const orderRows = [];
     if (st.dataStatus === 'live' && Array.isArray(st.livePayload?.recentOrders)) {
       st.livePayload.recentOrders.slice(0, 50).forEach((order, i) => {
-        const channel = this.CH.find(c => c.k === (order.channel === 'shopify_b2b' ? 'b2b' : 'd2c')) || this.CH[0];
+        const liveChannelKey = { shopify_d2c:'d2c', shopify_b2b:'b2b', amazon_us:'amzus', amazon_uk:'amzuk' }[order.channel] || 'd2c';
+        const channel = this.CH.find(c => c.k === liveChannelKey) || this.CH[0];
         const region = this.RG.find(g => g.k === (order.region_code || 'other')) || this.RG.find(g => g.k === 'other');
         const fulfillment = (order.fulfillment_status || '').toLowerCase();
         const financial = (order.financial_status || '').toLowerCase();

@@ -40,6 +40,37 @@ test('orders query uses Shopify shop currency and does not request customer emai
   assert.match(normalize, /email: null/);
 });
 
+test('Amazon order branches are orders-only, incremental, and independently checkpointed', () => {
+  const workflow = JSON.parse(fs.readFileSync(path.join(workflowDir, 'fb-dashboard-orders-incremental.disabled.json'), 'utf8'));
+  assert.equal(workflow.settings.timezone, 'Europe/London');
+  const schedule = workflow.nodes.find((node) => node.name === 'Schedule - Every 6 Hours (London)');
+  assert.ok(JSON.stringify(schedule.parameters).includes('0 0 */6 * * *'));
+
+  for (const market of [
+    { label:'Amazon US', store:'flavour-blaster-amazon-us', source:'shopify_orders_amazon_us', channel:'amazon_us', credential:'FB_AMAZON_US_SHOPIFY_OAUTH_REQUIRED' },
+    { label:'Amazon UK', store:'flavour-blaster-amazon-uk', source:'shopify_orders_amazon_uk', channel:'amazon_uk', credential:'FB_AMAZON_UK_SHOPIFY_OAUTH_REQUIRED' },
+  ]) {
+    const read = workflow.nodes.find((node) => node.name === `${market.label} | Read Checkpoint [CREDENTIAL REQUIRED]`);
+    const build = workflow.nodes.find((node) => node.name === `${market.label} | Build Incremental Window`);
+    const shopify = workflow.nodes.find((node) => node.name === `${market.label} | Shopify Orders Page`);
+    const normalize = workflow.nodes.find((node) => node.name === `${market.label} | Normalize Orders and Lines`);
+    const checkpoint = workflow.nodes.find((node) => node.name === `${market.label} | Upsert Success Checkpoint [CREDENTIAL REQUIRED]`);
+    assert.match(read.parameters.url, new RegExp(market.source));
+    assert.match(build.parameters.jsCode, /2025-01-01T00:00:00\.000Z/);
+    assert.match(build.parameters.jsCode, /10 \* 60000/);
+    assert.match(shopify.parameters.url, new RegExp(market.store));
+    assert.equal(shopify.credentials.shopifyOAuth2Api.id, market.credential);
+    assert.match(shopify.parameters.body, /updated_at:>=/);
+    assert.match(shopify.parameters.body, /created_at:>=2025-01-01/);
+    assert.doesNotMatch(shopify.parameters.body, /customer\s*\{|email|phone|billingAddress|shippingAddress/);
+    assert.match(build.parameters.jsCode, new RegExp(`channel:'${market.channel}'`));
+    assert.match(normalize.parameters.jsCode, /channel:\$json\.channel/);
+    assert.match(normalize.parameters.jsCode, /customer_id:null, customer_display_name:null/);
+    assert.match(checkpoint.parameters.body, /overlap_minutes:10/);
+    assert.match(checkpoint.parameters.body, /schedule_hours:6/);
+  }
+});
+
 test('order and product workflows enforce bounded cursor pagination, retries, throttling and success-only checkpoints', () => {
   for (const file of files.filter((name) => name.includes('orders') || name.includes('products'))) {
     const workflow = JSON.parse(fs.readFileSync(path.join(workflowDir, file), 'utf8'));
