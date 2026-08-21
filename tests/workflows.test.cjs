@@ -40,6 +40,26 @@ test('orders query uses Shopify shop currency and does not request customer emai
   assert.match(normalize, /email: null/);
 });
 
+test('Shopify sales events are incremental, idempotent, and contain no customer fields', () => {
+  const workflow = JSON.parse(fs.readFileSync(path.join(workflowDir, 'fb-dashboard-orders-incremental.disabled.json'), 'utf8'));
+  const read = workflow.nodes.find((node) => node.name === 'Sales Events | Read Checkpoint [CREDENTIAL REQUIRED]');
+  const build = workflow.nodes.find((node) => node.name === 'Sales Events | Build Incremental Window');
+  const shopify = workflow.nodes.find((node) => node.name === 'Sales Events | Shopify GraphQL Page');
+  const normalize = workflow.nodes.find((node) => node.name === 'Sales Events | Normalize Shopify Sales');
+  const upsert = workflow.nodes.find((node) => node.name === 'Supabase Upsert Sales Events [CREDENTIAL REQUIRED]');
+  const checkpoint = workflow.nodes.find((node) => node.name === 'Sales Events | Upsert Success Checkpoint [CREDENTIAL REQUIRED]');
+  assert.match(read.parameters.url, /shopify_sales_events/);
+  assert.match(build.parameters.jsCode, /7 \* 86400000/);
+  assert.match(build.parameters.jsCode, /10 \* 60000/);
+  assert.match(shopify.parameters.body, /agreements\(first: 50\)/);
+  assert.match(shopify.parameters.body, /sales\(first: 50\)/);
+  assert.doesNotMatch(shopify.parameters.body, /customer|email|phone|billingAddress|shippingAddress/);
+  assert.match(normalize.parameters.jsCode, /shopify_sale_id/);
+  assert.match(upsert.parameters.url, /fb_sales_events\?on_conflict=shopify_sale_id/);
+  assert.equal(upsert.credentials.httpCustomAuth.id, 'FB_SUPABASE_CUSTOM_REQUIRED');
+  assert.match(checkpoint.parameters.body, /idempotency_key:'shopify_sale_id'/);
+});
+
 test('Amazon order branches are orders-only, incremental, and independently checkpointed', () => {
   const workflow = JSON.parse(fs.readFileSync(path.join(workflowDir, 'fb-dashboard-orders-incremental.disabled.json'), 'utf8'));
   assert.equal(workflow.settings.timezone, 'Europe/London');

@@ -14,7 +14,7 @@
   }
 
   function emptyCell() {
-    return { o:0, s:0, u:0, v:0, dsc:0, rfS:0, rfU:0, cogs:0, ot:0 };
+    return { o:0, s:0, u:0, v:0, dsc:0, rfS:0, rfU:0, sh:0, tax:0, fee:0, cogs:0, ot:0 };
   }
 
   function normalize(payload, channels, regions) {
@@ -25,12 +25,12 @@
     var byDay = new Map();
     function dayRecord(day) {
       if (byDay.has(day)) return byDay.get(day);
-      var rec = { t:dateMs(day), ch:{}, reg:{}, cr:{}, o:0, s:0, u:0, v:0, dsc:0, rfS:0, rfU:0, cogs:0, ot:0, hw:new Array(24).fill(0) };
+      var rec = { t:dateMs(day), ch:{}, reg:{}, cr:{}, o:0, s:0, u:0, v:0, dsc:0, rfS:0, rfU:0, sh:0, tax:0, fee:0, cogs:0, ot:0, hw:new Array(24).fill(0) };
       channels.forEach(function (channel) {
         rec.ch[channel.k] = emptyCell();
-        rec.cr[channel.k] = regions.map(function () { return { o:0, s:0 }; });
+        rec.cr[channel.k] = regions.map(function () { return { o:0, s:0, dsc:0 }; });
       });
-      regions.forEach(function (region) { rec.reg[region.k] = { o:0, s:0 }; });
+      regions.forEach(function (region) { rec.reg[region.k] = { o:0, s:0, dsc:0 }; });
       byDay.set(day, rec);
       return rec;
     }
@@ -42,16 +42,27 @@
       var regionIndex = regions.findIndex(function (item) { return item.k === regionKey; });
       if (channelIndex < 0 || regionIndex < 0) return;
       var rec = dayRecord(row.day);
+      var grossSales = number(row.gross_sales);
+      var discounts = number(row.discounts);
+      var sourceNetSales = Number(row.net_sales);
+      var salesReversals = row.sales_reversals !== null && row.sales_reversals !== undefined
+        ? number(row.sales_reversals)
+        : (row.net_sales !== null && row.net_sales !== undefined && Number.isFinite(sourceNetSales)
+          ? grossSales - discounts - sourceNetSales
+          : number(row.refunds));
       var cell = {
-        o:number(row.orders), s:number(row.gross_sales), u:number(row.units), v:0,
-        dsc:number(row.discounts), rfS:number(row.refunds), rfU:0,
+        o:number(row.orders), s:grossSales, u:number(row.units), v:0,
+        dsc:discounts, rfS:salesReversals, rfU:0,
+        sh:number(row.shipping), tax:number(row.taxes), fee:number(row.return_fees),
         cogs:number(row.cogs), ot:number(row.fulfilled_on_time),
       };
       Object.keys(cell).forEach(function (key) { rec.ch[channelKey][key] += cell[key]; rec[key] += cell[key]; });
       rec.reg[regionKey].o += cell.o;
       rec.reg[regionKey].s += cell.s;
+      rec.reg[regionKey].dsc += cell.dsc;
       rec.cr[channelKey][regionIndex].o += cell.o;
       rec.cr[channelKey][regionIndex].s += cell.s;
+      rec.cr[channelKey][regionIndex].dsc += cell.dsc;
     });
 
     hourly.forEach(function (row) {
@@ -65,10 +76,12 @@
       var hourTotal = rec.hw.reduce(function (sum, value) { return sum + value; }, 0);
       if (hourTotal > 0) rec.hw = rec.hw.map(function (value) { return value / hourTotal; });
       rec.ns = rec.s - rec.dsc - rec.rfS;
+      rec.ts = rec.ns + rec.sh + rec.fee + rec.tax;
       rec.gp = rec.ns - rec.cogs;
       channels.forEach(function (channel) {
         var cell = rec.ch[channel.k];
         cell.ns = cell.s - cell.dsc - cell.rfS;
+        cell.ts = cell.ns + cell.sh + cell.fee + cell.tax;
         cell.gp = cell.ns - cell.cogs;
       });
     });

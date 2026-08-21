@@ -1034,6 +1034,168 @@
           "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
         }
       }
+    },
+    {
+      "parameters": {
+        "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_sync_state?source_key=eq.shopify_sales_events&select=source_key,cursor_updated_at,last_success_at,metadata",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "options": { "timeout": 120000 }
+      },
+      "id": "sales-events-read-checkpoint",
+      "name": "Sales Events | Read Checkpoint [CREDENTIAL REQUIRED]",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [ -680, 1960 ],
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\nconst checkpoint = rows.find(r => r && r.source_key === 'shopify_sales_events') || null;\nconst end = new Date();\nconst floor = new Date(Math.max(Date.parse('2025-01-01T00:00:00.000Z'), end.getTime() - 7 * 86400000));\nconst saved = checkpoint?.cursor_updated_at ? new Date(checkpoint.cursor_updated_at) : null;\nconst overlap = saved && !Number.isNaN(saved.getTime()) ? new Date(saved.getTime() - 10 * 60000) : floor;\nconst start = overlap > floor ? overlap : floor;\nreturn [{ json: { start:start.toISOString(), end:end.toISOString(), after:null, page:1, maxPages:50 } }];"
+      },
+      "id": "sales-events-build-window",
+      "name": "Sales Events | Build Incremental Window",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [ -440, 1960 ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://jetchill-mixology.myshopify.com/admin/api/2026-07/graphql.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ query: `query DashboardSalesEvents($query: String!, $after: String) { orders(first: 100, after: $after, sortKey: UPDATED_AT, query: $query) { pageInfo { hasNextPage endCursor } nodes { legacyResourceId agreements(first: 50) { nodes { id happenedAt reason sales(first: 50) { nodes { __typename id actionType lineType quantity totalAmount { shopMoney { amount currencyCode } } totalDiscountAmountBeforeTaxes { shopMoney { amount currencyCode } } totalDiscountAmountAfterTaxes { shopMoney { amount currencyCode } } totalTaxAmount { shopMoney { amount currencyCode } } } } } } } } }`, variables: { query: `updated_at:>=${$json.start.slice(0,10)} updated_at:<=${$json.end.slice(0,10)}`, after: $json.after } }) }}",
+        "options": { "timeout": 120000 }
+      },
+      "id": "sales-events-shopify-page",
+      "name": "Sales Events | Shopify GraphQL Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [ -180, 1960 ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "TOFvh8rHI1pD468B",
+          "name": "Flavour Blaster OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const state = $('Sales Events | Build Incremental Window').first().json;\nconst response = $json.data || $json;\nif (response.errors?.length) throw new Error(`SHOPIFY_SALES_EVENTS_ERROR: ${JSON.stringify(response.errors)}`);\nconst orders = response.orders?.nodes || [];\nconst events = [];\nconst id = value => Number(String(value || '').split('/').pop());\nfor (const order of orders) {\n  const orderId = Number(order.legacyResourceId);\n  for (const agreement of order.agreements?.nodes || []) {\n    for (const sale of agreement.sales?.nodes || []) {\n      const money = field => Number(sale[field]?.shopMoney?.amount || 0);\n      events.push({\n        shopify_sale_id:id(sale.id), shopify_agreement_id:id(agreement.id), shopify_order_id:orderId,\n        source_store:'jetchill-mixology', happened_at:agreement.happenedAt, agreement_reason:agreement.reason,\n        sale_type:sale.__typename, action_type:sale.actionType, line_type:sale.lineType, quantity:sale.quantity,\n        total_amount:money('totalAmount'), discount_before_taxes:money('totalDiscountAmountBeforeTaxes'),\n        discount_after_taxes:money('totalDiscountAmountAfterTaxes'), tax_amount:money('totalTaxAmount'),\n        currency_code:sale.totalAmount?.shopMoney?.currencyCode || 'GBP', fx_rate_to_usd:1, synced_at:new Date().toISOString()\n      });\n    }\n  }\n}\nreturn [{ json:{ events, state:{...state}, pageInfo:response.orders?.pageInfo || {hasNextPage:false,endCursor:null}, ordersRead:orders.length } }];"
+      },
+      "id": "sales-events-normalize",
+      "name": "Sales Events | Normalize Shopify Sales",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [ 80, 1960 ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_sales_events?on_conflict=shopify_sale_id",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name":"Prefer", "value":"resolution=merge-duplicates,return=minimal" },
+          { "name":"User-Agent", "value":"FlavourBlasterDashboard-n8n/1.0" }
+        ] },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($('Sales Events | Normalize Shopify Sales').item.json.events) }}",
+        "options": { "timeout": 120000 }
+      },
+      "id": "sales-events-upsert",
+      "name": "Supabase Upsert Sales Events [CREDENTIAL REQUIRED]",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [ 340, 1960 ],
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const normalized = $('Sales Events | Normalize Shopify Sales').first().json;\nconst hasNextPage = Boolean(normalized.pageInfo?.hasNextPage);\nconst page = Number(normalized.state.page || 1);\nconst maxPages = Number(normalized.state.maxPages || 50);\nif (hasNextPage && page >= maxPages) throw new Error('SALES_EVENTS_PAGE_LIMIT_REACHED');\nreturn [{ json:{ ...normalized.state, after:normalized.pageInfo?.endCursor || null, page:page + 1, hasNextPage } }];"
+      },
+      "id": "sales-events-advance",
+      "name": "Sales Events | Advance Cursor After Successful Write",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [ 600, 1960 ]
+    },
+    {
+      "parameters": {
+        "conditions": { "options": { "caseSensitive":true, "leftValue":"", "typeValidation":"strict", "version":2 }, "conditions":[{ "id":"sales-events-more", "leftValue":"={{ $json.hasNextPage }}", "rightValue":true, "operator":{ "type":"boolean", "operation":"true", "singleValue":true } }], "combinator":"and" },
+        "options": {}
+      },
+      "id": "sales-events-more-pages",
+      "name": "Sales Events | More Pages?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [ 840, 1960 ]
+    },
+    {
+      "parameters": { "amount":1, "unit":"seconds" },
+      "id": "sales-events-pause",
+      "name": "Sales Events | Rate Limit Pause - 1 Second",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [ 1080, 1900 ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_sync_state?on_conflict=source_key",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": { "parameters":[{ "name":"Prefer", "value":"resolution=merge-duplicates,return=minimal" }] },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify([{ source_key:'shopify_sales_events', cursor_updated_at:$json.end, last_success_at:$now.toISO(), metadata:{ overlap_minutes:10, schedule_hours:6, model:'Shopify SalesAgreement/Sale', idempotency_key:'shopify_sale_id', historical_floor:'2025-01-01' } }]) }}",
+        "options": { "timeout":120000 }
+      },
+      "id": "sales-events-save-checkpoint",
+      "name": "Sales Events | Upsert Success Checkpoint [CREDENTIAL REQUIRED]",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [ 1080, 2020 ],
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
+        }
+      }
     }
   ],
   "connections": {
@@ -1052,6 +1214,11 @@
           },
           {
             "node": "Amazon UK | Read Checkpoint [CREDENTIAL REQUIRED]",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Sales Events | Read Checkpoint [CREDENTIAL REQUIRED]",
             "type": "main",
             "index": 0
           }
@@ -1084,6 +1251,33 @@
           }
         ]
       ]
+    },
+    "Sales Events | Read Checkpoint [CREDENTIAL REQUIRED]": {
+      "main": [[{ "node":"Sales Events | Build Incremental Window", "type":"main", "index":0 }]]
+    },
+    "Sales Events | Build Incremental Window": {
+      "main": [[{ "node":"Sales Events | Shopify GraphQL Page", "type":"main", "index":0 }]]
+    },
+    "Sales Events | Shopify GraphQL Page": {
+      "main": [[{ "node":"Sales Events | Normalize Shopify Sales", "type":"main", "index":0 }]]
+    },
+    "Sales Events | Normalize Shopify Sales": {
+      "main": [[{ "node":"Supabase Upsert Sales Events [CREDENTIAL REQUIRED]", "type":"main", "index":0 }]]
+    },
+    "Supabase Upsert Sales Events [CREDENTIAL REQUIRED]": {
+      "main": [[{ "node":"Sales Events | Advance Cursor After Successful Write", "type":"main", "index":0 }]]
+    },
+    "Sales Events | Advance Cursor After Successful Write": {
+      "main": [[{ "node":"Sales Events | More Pages?", "type":"main", "index":0 }]]
+    },
+    "Sales Events | More Pages?": {
+      "main": [
+        [{ "node":"Sales Events | Rate Limit Pause - 1 Second", "type":"main", "index":0 }],
+        [{ "node":"Sales Events | Upsert Success Checkpoint [CREDENTIAL REQUIRED]", "type":"main", "index":0 }]
+      ]
+    },
+    "Sales Events | Rate Limit Pause - 1 Second": {
+      "main": [[{ "node":"Sales Events | Shopify GraphQL Page", "type":"main", "index":0 }]]
     },
     "Shopify GraphQL - Orders Page": {
       "main": [

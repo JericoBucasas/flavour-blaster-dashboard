@@ -43,6 +43,25 @@ test('Shopify rows map to dashboard channels, regions, and net sales', () => {
   assert.equal(result.days[0].hw[14], 1);
 });
 
+test('explicit Shopify net sales preserve sales reversals not present in refunds', () => {
+  const result = runtime().normalize({
+    daily:[{
+      day:'2026-08-20', channel:'shopify_d2c', region_code:'gb', orders:25,
+      gross_sales:9274.69, discounts:705.43, refunds:0, net_sales:8483.50,
+      shipping:404.50, taxes:311.46, return_fees:0, total_sales:9199.46,
+      units:202, cogs:0, fulfilled_on_time:22,
+    }],
+    hourly:[],
+  }, channels, regions);
+  assert.equal(result.days[0].ns, 8483.50);
+  assert.equal(result.days[0].sh, 404.50);
+  assert.equal(result.days[0].tax, 311.46);
+  assert.equal(result.days[0].ts, 9199.46);
+  assert.ok(Math.abs(result.days[0].rfS - 85.76) < 1e-9);
+  assert.equal(result.days[0].reg.gb.dsc, 705.43);
+  assert.equal(result.days[0].cr.d2c[2].dsc, 705.43);
+});
+
 test('live loader scopes the request to the active dashboard section', async () => {
   let requestedUrl = '';
   const context = {
