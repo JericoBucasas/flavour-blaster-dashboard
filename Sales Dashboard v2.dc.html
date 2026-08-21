@@ -125,7 +125,8 @@
       .directory-card { background:transparent !important;border:0 !important;box-shadow:none !important;padding:0 !important; }
       .directory-toolbar { align-items:stretch !important;gap:8px !important; }
       .dir-tabs { flex:1 1 100%;width:100%;box-sizing:border-box;overflow:visible; }
-      .dir-tab { flex:1 1 0;min-width:0;padding:9px 6px;font-size:12px; }
+      .dir-tab { flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;font-size:12px;line-height:1.15; }
+      .dir-tab > span { display:block; }
       .directory-columns { display:flex;justify-content:flex-end; }
       .directory-columns > .btn { min-height:44px; }
       .directory-note { margin:2px 0 10px !important;line-height:1.45 !important;opacity:.72 !important; }
@@ -141,6 +142,9 @@
       .sd-kpis > div > div:nth-child(2) { font-size:17px !important;margin-top:4px !important;overflow-wrap:anywhere; }
       .sd-kpis > div > div:nth-child(3) { height:auto !important;min-height:28px !important;line-height:1.3;margin-top:4px !important; }
       #sec-overview > .sd-kpis { display:none !important; }
+      #sec-products .sd-card-h > div { width:100%; }
+      #sec-products .sd-card-h select.input { flex:1 1 0 !important;width:auto !important;min-width:0 !important;max-width:none !important;font-size:12px;padding-left:8px;padding-right:24px; }
+      #sec-products .sd-card-h .btn { min-height:40px;padding-left:9px;padding-right:9px;font-size:12px; }
       #lg-ctrl .btn { flex: none; min-height: 40px; }
       /* controls live in the bottom Filters widget on mobile — hide the buttons but keep the row
          in the DOM so the fixed-position date/compare pickers can still open from the sheet */
