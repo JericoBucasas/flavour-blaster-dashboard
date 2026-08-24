@@ -869,7 +869,7 @@
             <tbody>
               <sc-for list="{{ orderRows }}" as="o" hint-placeholder-count="8">
                 <tr>
-                  <td style="font-variant-numeric:tabular-nums">{{ o.id }}</td>
+                  <td title="{{ o.id }}" style="min-width:96px;white-space:nowrap;font-weight:600;font-variant-numeric:tabular-nums">{{ o.id }}</td>
                   <td style="white-space:nowrap;opacity:0.75">{{ o.time }}</td>
                   <td title="{{ o.cust }}" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ o.cust }}</td>
                   <td><span style="display:inline-flex;align-items:center;gap:7px;white-space:nowrap"><span style="width:8px;height:8px;border-radius:50%;background:{{ o.chCol }}"></span>{{ o.ch }}</span></td>
