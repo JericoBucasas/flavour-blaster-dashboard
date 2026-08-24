@@ -59,6 +59,15 @@ test('total sales is the first KPI and drives the default overview chart', () =>
   assert.match(source, /gross:\['Gross sales over time', d => d\.s/);
 });
 
+test('total sales breakdown is collapsed by default and remains accessible', () => {
+  const source = fs.readFileSync('Sales Dashboard v2.dc.html', 'utf8');
+  assert.match(source, /salesBreakdownOpen:false/);
+  assert.match(source, /aria-expanded="\{\{ salesBreakdownExpanded \}\}"/);
+  assert.match(source, /<sc-if value="\{\{ salesBreakdownOpen \}\}" hint-placeholder-val="\{\{ false \}\}">/);
+  assert.match(source, /salesBreakdownTotal:this\.money2\(cur\.ts \|\| 0\)/);
+  assert.match(source, /salesBreakdownToggle:\(\)=>this\.setState\(\{salesBreakdownOpen:!st\.salesBreakdownOpen\}\)/);
+});
+
 test('Shopify financials never fall back to order snapshot formulas', () => {
   const source = fs.readFileSync('supabase/migrations/202608240004_shopify_event_authority.sql', 'utf8');
   assert.match(source, /create or replace function public\.fb_dashboard_snapshot_v5/);
