@@ -1423,7 +1423,7 @@ class Component extends DCLogic {
       },
       brandName:ls.brandV >= 3 && ls.brandName ? ls.brandName : 'Flavour Blaster', brandTag:ls.brandV >= 3 && ls.brandTag ? ls.brandTag : 'The Art of Aroma, Perfected!', logoData:ls.brandV >= 3 && ls.logoData ? ls.logoData : './assets/flavour-blaster-b.jpeg', growthO:ls.growthO ?? null, coverO:ls.coverO ?? null, retO:ls.retO ?? null, areaO:ls.areaO ?? null, dataMode:'live', dataUrl:'/api/dashboard',
       dataStatus:'loading', dataError:null, dataRequestKey:null, dataUpdatedAt:null, dataCoverageStart:null, dataCoverageEnd:null, dataBaseCurrency:null, shopifyReconciliation:null, livePayload:null,
-      repCur:ls.repCur || 'USD', fxAuto:ls.fxAuto ?? true, fxFetched:null, targetMode:ls.targetMode || 'growth', targetAbs:ls.targetAbs ?? null, chCfg:ls.chCfg || {}, rgCfg:ls.rgCfg || {},
+      repCur:'GBP', fxAuto:ls.fxAuto ?? true, fxFetched:null, targetMode:ls.targetMode || 'growth', targetAbs:ls.targetAbs ?? null, chCfg:ls.chCfg || {}, rgCfg:ls.rgCfg || {},
       flagsOn:ls.flagsOn || {}, agingDays:ls.agingDays || 2, anomSens:ls.anomSens || 'med', density:ls.density || 'comfortable', contentW:[1200,1400,1600,2000].includes(ls.contentW) ? ls.contentW : 1200,
       kpiOn:ls.kpiOn || {}, kpiOrder:ls.kpiOrder || null, defView:ls.defView || null, defRange:ls.defRange || null, defCmp:ls.defCmp || null,
       chOn:Object.fromEntries(this.CH.map(c => [c.k, c.k === 'd2c' || c.k === 'b2b'])), rgOn:Object.fromEntries(this.RG.map(g => [g.k, true])) };

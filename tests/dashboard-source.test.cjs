@@ -20,6 +20,7 @@ test('dashboard loads only the selected and comparison ranges without reload loo
   assert.doesNotMatch(source, /const start = '2019-01-01'/);
   assert.match(source, /Shopify-authoritative financials/);
   assert.match(source, /c\.k === 'd2c' \|\| c\.k === 'b2b'/);
+  assert.match(source, /repCur:'GBP'/);
   assert.doesNotMatch(source, /d2c:true, b2b:true, amzus:true, amzuk:true/);
   assert.doesNotMatch(source, /Sample fallback/);
 });
