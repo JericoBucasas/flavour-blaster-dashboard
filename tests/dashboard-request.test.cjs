@@ -39,9 +39,14 @@ test('directory request clamps the server-side page size', () => {
   assert.deepEqual(JSON.parse(request.options.body), { p_limit:500 });
 });
 
-test('snapshot response redacts customer and order identifiers', () => {
+test('snapshot response keeps display names while redacting raw order identifiers', () => {
   const data = sanitizeSnapshot({ recentOrders:[{ shopify_order_id:12345, order_name:'#12345', customer_display_name:'Jane Doe', channel:'shopify_d2c' }] });
   assert.equal(data.recentOrders[0].order_name, '#••••2345');
-  assert.equal(data.recentOrders[0].customer_display_name, 'Customer');
+  assert.equal(data.recentOrders[0].customer_display_name, 'Jane Doe');
   assert.equal('shopify_order_id' in data.recentOrders[0], false);
+});
+
+test('snapshot response labels unavailable Amazon customer names truthfully', () => {
+  const data = sanitizeSnapshot({ recentOrders:[{ order_name:'112-123', customer_display_name:null, channel:'amazon_us' }] });
+  assert.equal(data.recentOrders[0].customer_display_name, 'Amazon customer');
 });

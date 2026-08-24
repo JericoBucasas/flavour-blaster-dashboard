@@ -75,6 +75,15 @@ test('selected date range stays readable on one line in the desktop control bar'
   assert.match(source, /class="sd-date-btn-label">\{\{ dateBtnLabel \}\}<\/span>/);
 });
 
+test('orders view applies active channel and region filters to rows and hourly data', () => {
+  const source = fs.readFileSync('Sales Dashboard v2.dc.html', 'utf8');
+  assert.match(source, /st\.livePayload\.recentOrders\.filter\(order =>/);
+  assert.match(source, /!!st\.chOn\[channelKey\] && !!st\.rgOn\[regionKey\]/);
+  assert.match(source, /d\.hcr\[c\.k\]\?\.\[gi\]/);
+  assert.match(source, /out\.hw = hourTotal > 0 \? filteredHours\.map/);
+  assert.match(source, /No orders match the selected channels, regions, or table filter\./);
+});
+
 test('Shopify financials never fall back to order snapshot formulas', () => {
   const source = fs.readFileSync('supabase/migrations/202608240004_shopify_event_authority.sql', 'utf8');
   assert.match(source, /create or replace function public\.fb_dashboard_snapshot_v5/);

@@ -25,10 +25,11 @@
     var byDay = new Map();
     function dayRecord(day) {
       if (byDay.has(day)) return byDay.get(day);
-      var rec = { t:dateMs(day), ch:{}, reg:{}, cr:{}, o:0, s:0, aovS:0, aovO:0, u:0, v:0, dsc:0, rfS:0, rfU:0, sh:0, tax:0, fee:0, cogs:0, ot:0, hw:new Array(24).fill(0) };
+      var rec = { t:dateMs(day), ch:{}, reg:{}, cr:{}, hcr:{}, o:0, s:0, aovS:0, aovO:0, u:0, v:0, dsc:0, rfS:0, rfU:0, sh:0, tax:0, fee:0, cogs:0, ot:0, hw:new Array(24).fill(0) };
       channels.forEach(function (channel) {
         rec.ch[channel.k] = emptyCell();
         rec.cr[channel.k] = regions.map(function () { return { o:0, s:0, aovS:0, aovO:0, dsc:0 }; });
+        rec.hcr[channel.k] = regions.map(function () { return new Array(24).fill(0); });
       });
       regions.forEach(function (region) { rec.reg[region.k] = { o:0, s:0, aovS:0, aovO:0, dsc:0 }; });
       byDay.set(day, rec);
@@ -75,7 +76,13 @@
     hourly.forEach(function (row) {
       var rec = byDay.get(String(row.day));
       var hour = Math.max(0, Math.min(23, number(row.hour)));
-      if (rec) rec.hw[hour] += number(row.orders);
+      if (!rec) return;
+      var orders = number(row.orders);
+      var channelKey = CHANNEL_MAP[row.channel];
+      var regionKey = REGION_MAP[row.region_code];
+      var regionIndex = regions.findIndex(function (item) { return item.k === regionKey; });
+      rec.hw[hour] += orders;
+      if (channelKey && rec.hcr[channelKey] && regionIndex >= 0) rec.hcr[channelKey][regionIndex][hour] += orders;
     });
 
     var days = Array.from(byDay.values()).sort(function (a, b) { return a.t - b.t; });

@@ -871,7 +871,7 @@
                 <tr>
                   <td style="font-variant-numeric:tabular-nums">{{ o.id }}</td>
                   <td style="white-space:nowrap;opacity:0.75">{{ o.time }}</td>
-                  <td>{{ o.cust }}</td>
+                  <td title="{{ o.cust }}" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ o.cust }}</td>
                   <td><span style="display:inline-flex;align-items:center;gap:7px;white-space:nowrap"><span style="width:8px;height:8px;border-radius:50%;background:{{ o.chCol }}"></span>{{ o.ch }}</span></td>
                   <td>{{ o.region }}</td>
                   <td style="text-align:right;font-variant-numeric:tabular-nums">{{ o.items }}</td>
@@ -880,6 +880,9 @@
                   <td style="font-size:12px;opacity:0.7;white-space:nowrap">{{ o.tagsTxt }}</td>
                 </tr>
               </sc-for>
+              <sc-if value="{{ ordersEmpty }}" hint-placeholder-val="{{ false }}">
+                <tr><td colspan="9" style="padding:28px 16px;text-align:center;color:var(--color-neutral-600)">No orders match the selected channels, regions, or table filter.</td></tr>
+              </sc-if>
             </tbody>
           </table>
         </div>
@@ -1697,18 +1700,24 @@ class Component extends DCLogic {
   filterDay(d) {
     const st = this.state;
     if (!st || !st.chOn) return d;
+    const filteredHours = new Array(24).fill(0);
+    const hasDimensionalHours = d.hcr && typeof d.hcr === 'object';
     const out = { t:d.t, hw:d.hw, ch:{}, reg:{}, o:0, s:0, aovS:0, aovO:0, u:0, v:0, dsc:0, rfS:0, rfU:0, sh:0, tax:0, fee:0, cogs:0, ot:0 };
     for (const g of this.RG) out.reg[g.k] = { o:0, s:0, aovS:0, aovO:0, dsc:0 };
     for (const c of this.CH) {
       const src = d.ch[c.k];
       if (!st.chOn[c.k]) { out.ch[c.k] = { o:0, s:0, aovS:0, aovO:0, u:0, v:0, dsc:0, rfS:0, rfU:0, sh:0, tax:0, fee:0, cogs:0, ot:0 }; continue; }
       let o = 0, s = 0, aovS = 0, aovO = 0, dsc = 0, hasRegionDiscounts = false;
-      this.RG.forEach((g, gi) => { if (st.rgOn[g.k]) { const x = d.cr[c.k][gi]; o += x.o; s += x.s; aovS += Number.isFinite(+x.aovS) ? +x.aovS : x.s - (+x.dsc || 0); aovO += Number.isFinite(+x.aovO) ? +x.aovO : x.o; if (Number.isFinite(+x.dsc)) { dsc += +x.dsc; hasRegionDiscounts = true; } out.reg[g.k].o += x.o; out.reg[g.k].s += x.s; out.reg[g.k].aovS += Number.isFinite(+x.aovS) ? +x.aovS : x.s - (+x.dsc || 0); out.reg[g.k].aovO += Number.isFinite(+x.aovO) ? +x.aovO : x.o; out.reg[g.k].dsc += Number.isFinite(+x.dsc) ? +x.dsc : 0; } });
+      this.RG.forEach((g, gi) => { if (st.rgOn[g.k]) { const x = d.cr[c.k][gi]; o += x.o; s += x.s; aovS += Number.isFinite(+x.aovS) ? +x.aovS : x.s - (+x.dsc || 0); aovO += Number.isFinite(+x.aovO) ? +x.aovO : x.o; if (Number.isFinite(+x.dsc)) { dsc += +x.dsc; hasRegionDiscounts = true; } out.reg[g.k].o += x.o; out.reg[g.k].s += x.s; out.reg[g.k].aovS += Number.isFinite(+x.aovS) ? +x.aovS : x.s - (+x.dsc || 0); out.reg[g.k].aovO += Number.isFinite(+x.aovO) ? +x.aovO : x.o; out.reg[g.k].dsc += Number.isFinite(+x.dsc) ? +x.dsc : 0; if (hasDimensionalHours && d.hcr[c.k]?.[gi]) d.hcr[c.k][gi].forEach((v, h) => { filteredHours[h] += +v || 0; }); } });
       const f = src.s > 0 ? s / src.s : 0;
       if (!hasRegionDiscounts) { dsc = src.dsc * f; this.RG.forEach(g => { if (st.rgOn[g.k] && s > 0) out.reg[g.k].dsc = dsc * out.reg[g.k].s / s; }); }
       const cell = { o, s, aovS, aovO, u:src.u * f, v:src.v * f, dsc, rfS:src.rfS * f, rfU:src.rfU * f, sh:(src.sh || 0) * f, tax:(src.tax || 0) * f, fee:(src.fee || 0) * f, cogs:src.cogs * f, ot:src.ot * f };
       out.ch[c.k] = cell;
       out.o += o; out.s += s; out.aovS += cell.aovS; out.aovO += cell.aovO; out.u += cell.u; out.v += cell.v; out.dsc += cell.dsc; out.rfS += cell.rfS; out.rfU += cell.rfU; out.sh += cell.sh; out.tax += cell.tax; out.fee += cell.fee; out.cogs += cell.cogs; out.ot += cell.ot;
+    }
+    if (hasDimensionalHours) {
+      const hourTotal = filteredHours.reduce((sum, value) => sum + value, 0);
+      out.hw = hourTotal > 0 ? filteredHours.map(value => value / hourTotal) : filteredHours;
     }
     return this.finish(out);
   }
@@ -2168,7 +2177,11 @@ class Component extends DCLogic {
     let clock = 21 * 60 + 58;
     const orderRows = [];
     if (st.dataStatus === 'live' && Array.isArray(st.livePayload?.recentOrders)) {
-      st.livePayload.recentOrders.slice(0, 50).forEach((order, i) => {
+      st.livePayload.recentOrders.filter(order => {
+        const channelKey = { shopify_d2c:'d2c', shopify_b2b:'b2b', amazon_us:'amzus', amazon_uk:'amzuk' }[order.channel];
+        const regionKey = order.region_code || 'other';
+        return !!channelKey && !!st.chOn[channelKey] && !!st.rgOn[regionKey];
+      }).slice(0, 50).forEach((order, i) => {
         const liveChannelKey = { shopify_d2c:'d2c', shopify_b2b:'b2b', amazon_us:'amzus', amazon_uk:'amzuk' }[order.channel] || 'd2c';
         const channel = this.CH.find(c => c.k === liveChannelKey) || this.CH[0];
         const region = this.RG.find(g => g.k === (order.region_code || 'other')) || this.RG.find(g => g.k === 'other');
@@ -2179,7 +2192,7 @@ class Component extends DCLogic {
         const tags = Array.isArray(order.tags) ? order.tags : [];
         const total = +order.total_sales || 0;
         const time = order.processed_at ? new Date(order.processed_at).toLocaleString('en-GB', { timeZone:'Europe/London', day:'numeric', month:'short', hour:'numeric', minute:'2-digit' }) : '—';
-        orderRows.push({ id:order.order_name || 'Order', time, cust:order.customer_display_name || 'Customer', ch:channel.n, chCol:channel.c, region:region?.n || 'Other',
+        orderRows.push({ id:order.order_name || 'Order', time, cust:order.customer_display_name || (liveChannelKey === 'amzus' || liveChannelKey === 'amzuk' ? 'Amazon customer' : 'Guest'), ch:channel.n, chCol:channel.c, region:region?.n || 'Other',
           items:String(+order.total_quantity || 0), total:this.money2(total), status, tagClass, tags, tagsTxt:tags.join(', '),
           _s:{ order:order.order_name || '', date:-i, customer:order.customer_display_name || '', channel:channel.n, region:region?.n || 'Other', items:+order.total_quantity || 0, total, status, tags:tags.join(', ') } });
       });
@@ -2674,7 +2687,7 @@ class Component extends DCLogic {
       kpis, salesBreakdown, salesBreakdownOpen:st.salesBreakdownOpen, salesBreakdownExpanded:st.salesBreakdownOpen ? 'true' : 'false',
       salesBreakdownTotal:this.money2(cur.ts || 0), salesBreakdownIcon:st.salesBreakdownOpen ? 'ph-caret-up' : 'ph-caret-down',
       salesBreakdownToggle:()=>this.setState({salesBreakdownOpen:!st.salesBreakdownOpen}),
-      chRows, chCards, regRows, regCards, heat, ordKpis, orderRows, prodRows, prodKpis, deadRows, returnRows, custKpis, custRows, filterDDs,
+      chRows, chCards, regRows, regCards, heat, ordKpis, orderRows, ordersEmpty:orderRows.length === 0, prodRows, prodKpis, deadRows, returnRows, custKpis, custRows, filterDDs,
     };
   }
   buildCal(baseT, selS, selE, pick) {

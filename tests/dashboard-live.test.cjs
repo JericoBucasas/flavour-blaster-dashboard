@@ -43,6 +43,23 @@ test('Shopify rows map to dashboard channels, regions, and net sales', () => {
   assert.equal(result.days[0].hw[14], 1);
 });
 
+test('hourly orders retain channel and region dimensions for dashboard filters', () => {
+  const result = runtime().normalize({
+    daily:[
+      { day:'2026-08-20', channel:'shopify_d2c', region_code:'gb', orders:2, gross_sales:20 },
+      { day:'2026-08-20', channel:'amazon_us', region_code:'us', orders:3, gross_sales:30 },
+    ],
+    hourly:[
+      { day:'2026-08-20', hour:9, orders:2, channel:'shopify_d2c', region_code:'gb' },
+      { day:'2026-08-20', hour:14, orders:3, channel:'amazon_us', region_code:'us' },
+    ],
+  }, channels, regions);
+  assert.equal(result.days[0].hcr.d2c[2][9], 2);
+  assert.equal(result.days[0].hcr.amzus[0][14], 3);
+  assert.equal(result.days[0].hw[9], 0.4);
+  assert.equal(result.days[0].hw[14], 0.6);
+});
+
 test('explicit Shopify net sales preserve sales reversals not present in refunds', () => {
   const result = runtime().normalize({
     daily:[{
