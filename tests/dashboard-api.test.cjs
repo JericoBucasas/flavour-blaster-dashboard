@@ -47,7 +47,7 @@ test('orders section only requests the sales snapshot', async () => {
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.status, 'live');
     assert.equal(requests.length, 1);
-    assert.match(requests[0], /fb_dashboard_snapshot_v3$/);
+    assert.match(requests[0], /fb_dashboard_snapshot_v4$/);
     assert.equal(res.body.data.productCatalog, undefined);
     assert.equal(res.body.data.customerDirectory, undefined);
   } finally {

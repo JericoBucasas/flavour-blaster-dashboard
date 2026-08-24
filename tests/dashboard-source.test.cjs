@@ -23,3 +23,13 @@ test('GBP reporting snapshot preserves Shopify values and converts Amazon rows',
   assert.match(source, /revoke all on function public\.fb_dashboard_snapshot_v3/);
   assert.match(source, /grant execute on function public\.fb_dashboard_snapshot_v3\(date, date\) to service_role/);
 });
+
+test('AOV snapshot uses initial order sales and keeps draft-order completion edits', () => {
+  const source = fs.readFileSync('supabase/migrations/202608240003_shopify_aov.sql', 'utf8');
+  assert.match(source, /create or replace function public\.fb_dashboard_snapshot_v4/);
+  assert.match(source, /'draft_order' = any\(o\.tags\).*agreement_reason = 'ORDER_EDIT'/s);
+  assert.match(source, /'aov_sales'/);
+  assert.match(source, /'aov_orders'/);
+  assert.match(source, /revoke all on function public\.fb_dashboard_snapshot_v4/);
+  assert.match(source, /grant execute on function public\.fb_dashboard_snapshot_v4\(date, date\) to service_role/);
+});

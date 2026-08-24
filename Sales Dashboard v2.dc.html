@@ -1586,7 +1586,7 @@ class Component extends DCLogic {
     for (let i = 0; i < N; i++) {
       const t = t0 + i * this.D, d = new Date(t), dow = d.getUTCDay(), mo = d.getUTCMonth();
       const trend = 1 + 0.26 * i / N, mf = this.MF[mo];
-      const rec = { t, ch:{}, reg:{}, o:0, s:0, u:0, v:0, dsc:0, rfS:0, rfU:0, cogs:0, ot:0 };
+      const rec = { t, ch:{}, reg:{}, o:0, s:0, aovS:0, aovO:0, u:0, v:0, dsc:0, rfS:0, rfU:0, cogs:0, ot:0 };
       for (const c of this.CH) {
         const o = Math.round(c.base * c.wk[dow] * trend * mf * (0.85 + 0.3 * r()));
         const s = o * c.aov * (0.93 + 0.14 * r());
@@ -1597,15 +1597,15 @@ class Component extends DCLogic {
         const rfU = u * c.rr * (0.7 + 0.6 * r());
         const cogs = (s - dsc - rfS) * (1 - c.gm * (0.96 + 0.08 * r()));
         const ot = o * (0.86 + 0.12 * r());
-        rec.ch[c.k] = { o, s, u, v, dsc, rfS, rfU, cogs, ot };
-        rec.o += o; rec.s += s; rec.u += u; rec.v += v; rec.dsc += dsc; rec.rfS += rfS; rec.rfU += rfU; rec.cogs += cogs; rec.ot += ot;
+        rec.ch[c.k] = { o, s, aovS:s - dsc, aovO:o, u, v, dsc, rfS, rfU, cogs, ot };
+        rec.o += o; rec.s += s; rec.aovS += s - dsc; rec.aovO += o; rec.u += u; rec.v += v; rec.dsc += dsc; rec.rfS += rfS; rec.rfU += rfU; rec.cogs += cogs; rec.ot += ot;
       }
-      for (const g of this.RG) rec.reg[g.k] = { o:0, s:0 };
+      for (const g of this.RG) rec.reg[g.k] = { o:0, s:0, aovS:0, aovO:0 };
       rec.cr = {};
       for (const c of this.CH) {
         const w = this.RW[c.k].map(x => x * (0.85 + 0.3 * r()));
         const sw = w.reduce((a, b) => a + b, 0);
-        rec.cr[c.k] = this.RG.map((g, gi) => { const f = w[gi] / sw; const cell = { o:rec.ch[c.k].o * f, s:rec.ch[c.k].s * f }; rec.reg[g.k].o += cell.o; rec.reg[g.k].s += cell.s; return cell; });
+        rec.cr[c.k] = this.RG.map((g, gi) => { const f = w[gi] / sw; const cell = { o:rec.ch[c.k].o * f, s:rec.ch[c.k].s * f, aovS:rec.ch[c.k].aovS * f, aovO:rec.ch[c.k].aovO * f }; rec.reg[g.k].o += cell.o; rec.reg[g.k].s += cell.s; rec.reg[g.k].aovS += cell.aovS; rec.reg[g.k].aovO += cell.aovO; return cell; });
       }
       // per-day hourly curve, with occasional promo spikes and checkout dips
       const hw = []; let hsum = 0;
@@ -1654,31 +1654,31 @@ class Component extends DCLogic {
   filterDay(d) {
     const st = this.state;
     if (!st || !st.chOn) return d;
-    const out = { t:d.t, hw:d.hw, ch:{}, reg:{}, o:0, s:0, u:0, v:0, dsc:0, rfS:0, rfU:0, sh:0, tax:0, fee:0, cogs:0, ot:0 };
-    for (const g of this.RG) out.reg[g.k] = { o:0, s:0, dsc:0 };
+    const out = { t:d.t, hw:d.hw, ch:{}, reg:{}, o:0, s:0, aovS:0, aovO:0, u:0, v:0, dsc:0, rfS:0, rfU:0, sh:0, tax:0, fee:0, cogs:0, ot:0 };
+    for (const g of this.RG) out.reg[g.k] = { o:0, s:0, aovS:0, aovO:0, dsc:0 };
     for (const c of this.CH) {
       const src = d.ch[c.k];
-      if (!st.chOn[c.k]) { out.ch[c.k] = { o:0, s:0, u:0, v:0, dsc:0, rfS:0, rfU:0, sh:0, tax:0, fee:0, cogs:0, ot:0 }; continue; }
-      let o = 0, s = 0, dsc = 0, hasRegionDiscounts = false;
-      this.RG.forEach((g, gi) => { if (st.rgOn[g.k]) { const x = d.cr[c.k][gi]; o += x.o; s += x.s; if (Number.isFinite(+x.dsc)) { dsc += +x.dsc; hasRegionDiscounts = true; } out.reg[g.k].o += x.o; out.reg[g.k].s += x.s; out.reg[g.k].dsc += Number.isFinite(+x.dsc) ? +x.dsc : 0; } });
+      if (!st.chOn[c.k]) { out.ch[c.k] = { o:0, s:0, aovS:0, aovO:0, u:0, v:0, dsc:0, rfS:0, rfU:0, sh:0, tax:0, fee:0, cogs:0, ot:0 }; continue; }
+      let o = 0, s = 0, aovS = 0, aovO = 0, dsc = 0, hasRegionDiscounts = false;
+      this.RG.forEach((g, gi) => { if (st.rgOn[g.k]) { const x = d.cr[c.k][gi]; o += x.o; s += x.s; aovS += Number.isFinite(+x.aovS) ? +x.aovS : x.s - (+x.dsc || 0); aovO += Number.isFinite(+x.aovO) ? +x.aovO : x.o; if (Number.isFinite(+x.dsc)) { dsc += +x.dsc; hasRegionDiscounts = true; } out.reg[g.k].o += x.o; out.reg[g.k].s += x.s; out.reg[g.k].aovS += Number.isFinite(+x.aovS) ? +x.aovS : x.s - (+x.dsc || 0); out.reg[g.k].aovO += Number.isFinite(+x.aovO) ? +x.aovO : x.o; out.reg[g.k].dsc += Number.isFinite(+x.dsc) ? +x.dsc : 0; } });
       const f = src.s > 0 ? s / src.s : 0;
       if (!hasRegionDiscounts) { dsc = src.dsc * f; this.RG.forEach(g => { if (st.rgOn[g.k] && s > 0) out.reg[g.k].dsc = dsc * out.reg[g.k].s / s; }); }
-      const cell = { o, s, u:src.u * f, v:src.v * f, dsc, rfS:src.rfS * f, rfU:src.rfU * f, sh:(src.sh || 0) * f, tax:(src.tax || 0) * f, fee:(src.fee || 0) * f, cogs:src.cogs * f, ot:src.ot * f };
+      const cell = { o, s, aovS, aovO, u:src.u * f, v:src.v * f, dsc, rfS:src.rfS * f, rfU:src.rfU * f, sh:(src.sh || 0) * f, tax:(src.tax || 0) * f, fee:(src.fee || 0) * f, cogs:src.cogs * f, ot:src.ot * f };
       out.ch[c.k] = cell;
-      out.o += o; out.s += s; out.u += cell.u; out.v += cell.v; out.dsc += cell.dsc; out.rfS += cell.rfS; out.rfU += cell.rfU; out.sh += cell.sh; out.tax += cell.tax; out.fee += cell.fee; out.cogs += cell.cogs; out.ot += cell.ot;
+      out.o += o; out.s += s; out.aovS += cell.aovS; out.aovO += cell.aovO; out.u += cell.u; out.v += cell.v; out.dsc += cell.dsc; out.rfS += cell.rfS; out.rfU += cell.rfU; out.sh += cell.sh; out.tax += cell.tax; out.fee += cell.fee; out.cogs += cell.cogs; out.ot += cell.ot;
     }
     return this.finish(out);
   }
   agg(s, e) {
     const ds = this.days.filter(d => d.t >= s && d.t <= e).map(d => this.filterDay(d));
-    const A = { ds, o:0, s:0, u:0, v:0, dsc:0, rfS:0, rfU:0, sh:0, tax:0, fee:0, cogs:0, ot:0, ch:{}, reg:{} };
-    const F = ['o','s','u','v','dsc','rfS','rfU','sh','tax','fee','cogs','ot'];
+    const A = { ds, o:0, s:0, aovS:0, aovO:0, u:0, v:0, dsc:0, rfS:0, rfU:0, sh:0, tax:0, fee:0, cogs:0, ot:0, ch:{}, reg:{} };
+    const F = ['o','s','aovS','aovO','u','v','dsc','rfS','rfU','sh','tax','fee','cogs','ot'];
     for (const c of this.CH) { A.ch[c.k] = {}; for (const f of F) A.ch[c.k][f] = 0; }
-    for (const g of this.RG) A.reg[g.k] = { o:0, s:0, dsc:0 };
+    for (const g of this.RG) A.reg[g.k] = { o:0, s:0, aovS:0, aovO:0, dsc:0 };
     for (const d of ds) {
       for (const f of F) A[f] += d[f] || 0;
       for (const c of this.CH) for (const f of F) A.ch[c.k][f] += d.ch[c.k][f] || 0;
-      for (const g of this.RG) { A.reg[g.k].o += d.reg[g.k].o; A.reg[g.k].s += d.reg[g.k].s; A.reg[g.k].dsc += d.reg[g.k].dsc || 0; }
+      for (const g of this.RG) { A.reg[g.k].o += d.reg[g.k].o; A.reg[g.k].s += d.reg[g.k].s; A.reg[g.k].aovS += d.reg[g.k].aovS || 0; A.reg[g.k].aovO += d.reg[g.k].aovO || 0; A.reg[g.k].dsc += d.reg[g.k].dsc || 0; }
     }
     for (const c of this.CH) this.finish(A.ch[c.k]);
     return this.finish(A);
@@ -1865,7 +1865,7 @@ class Component extends DCLogic {
       bg:st.cmpMode === k ? 'var(--color-accent-100)' : 'transparent', col:st.cmpMode === k ? 'var(--color-accent-800)' : 'inherit',
       click:k === 'custom' ? () => this.setState({ cmpCustomOpen:true, cmpDraftS:null, cmpDraftE:null, cmpCalBase:cmpBase }) : () => this.setState({ cmpMode:k, compare:k !== 'none', cmpOpen:false, cmpCustomOpen:false, hi:null, ...(this.state.retSheet ? { filterSheet:true, retSheet:false } : {}) }) }));
 
-    const cAov = cur.o ? (cur.s - cur.dsc) / cur.o : 0, pAov = prev.o ? (prev.s - prev.dsc) / prev.o : 0;
+    const cAov = cur.aovO ? cur.aovS / cur.aovO : 0, pAov = prev.aovO ? prev.aovS / prev.aovO : 0;
     const cConv = cur.v ? cur.o / cur.v : 0, pConv = prev.v ? prev.o / prev.v : 0;
     const liveProductMetrics = st.dataStatus === 'live' && Array.isArray(st.livePayload?.products) ? st.livePayload.products : [];
     const liveProductNet = liveProductMetrics.reduce((sum, p) => sum + (+p.net_sales || 0), 0);
@@ -1883,7 +1883,7 @@ class Component extends DCLogic {
       { k:'gross', label:'Gross sales', val:this.money(cur.s), ...this.delta(cur.s, prev.s), ...this.sparks(cur, prev, d => d.s) },
       { k:'net', label:'Net sales', val:this.money(cur.ns), ...this.delta(cur.ns, prev.ns), ...this.sparks(cur, prev, d => d.ns) },
       { k:'orders', label:'Orders', val:this.num(cur.o), ...this.delta(cur.o, prev.o), ...this.sparks(cur, prev, d => d.o) },
-      { k:'aov', label:'Average order value', val:this.money2(cAov), ...this.delta(cAov, pAov), ...this.sparks(cur, prev, d => d.o ? (d.s - d.dsc) / d.o : 0, null, true) },
+      { k:'aov', label:'Average order value', val:this.money2(cAov), ...this.delta(cAov, pAov), ...this.sparks(cur, prev, d => d.aovO ? d.aovS / d.aovO : 0, null, true) },
       st.dataStatus === 'live' ? { k:'conv', label:'Conversion rate', val:'—', delta:'Sessions not connected', dcol:'inherit', spark:'', spark2:'' } : { k:'conv', label:'Conversion rate', val:this.pct(cConv, 2), ...this.delta(cConv, pConv), ...this.sparks(cur, prev, d => d.v ? d.o / d.v : 0, null, true) },
       st.dataStatus === 'live' && !liveCostAvailable ? { k:'margin', label:'Gross margin', val:'—', delta:'Product cost unavailable', dcol:'inherit', spark:'', spark2:'' } : { k:'margin', label:'Gross margin', val:this.pct(cMar), ...this.delta(cMar, pMar), ...this.sparks(cur, prev, d => d.ns ? d.gp / d.ns : 0, null, true) },
       { k:'disc', label:'Discount rate', val:this.pct(cDisc), ...this.delta(cDisc, pDisc, true), ...this.sparks(cur, prev, d => d.s ? d.dsc / d.s : 0, A2, true) },
@@ -1938,7 +1938,7 @@ class Component extends DCLogic {
       gross:['Total sales over time', d => d.s, km, m2, true],
       net:['Net sales over time', d => d.ns, km, m2, true],
       orders:['Orders over time', d => d.o, kn, n2, true],
-      aov:['Average order value over time', d => d.o ? (d.s - d.dsc) / d.o : 0, v => this.money(v), v => this.money2(v), false],
+      aov:['Average order value over time', d => d.aovO ? d.aovS / d.aovO : 0, v => this.money(v), v => this.money2(v), false],
       conv:['Conversion rate over time', d => d.v ? d.o / d.v : 0, pf, pf2, false],
       margin:['Gross margin over time', d => d.ns ? d.gp / d.ns : 0, pf, pf, false],
       disc:['Discount rate over time', d => d.s ? d.dsc / d.s : 0, pf, pf, false],
@@ -1993,7 +1993,7 @@ class Component extends DCLogic {
       const x = cur.ch[c.k], p = prev.ch[c.k];
       const rr = x.u ? x.rfU / x.u : 0;
       return { name:c.n, col:c.c, sales:this.money(x.s), net:this.money(x.ns), native:c.cur === 'USD' ? '\u2014' : this.fx(x.s, c.cur),
-        orders:this.num(x.o), aov:this.money2(x.o ? (x.s - x.dsc) / x.o : 0), units:this.num(x.u), sessions:this.num(x.v),
+        orders:this.num(x.o), aov:this.money2(x.aovO ? x.aovS / x.aovO : 0), units:this.num(x.u), sessions:this.num(x.v),
         conv:x.v ? this.pct(x.o / x.v, 2) : '\u2014', discRate:this.pct(x.s ? x.dsc / x.s : 0), retRate:st.dataStatus === 'live' ? '\u2014' : this.pct(rr),
         retCol:rr > retCeil ? 'var(--color-accent-2-700)' : 'inherit', margin:st.dataStatus === 'live' && !liveCostAvailable ? '\u2014' : this.pct(x.ns ? x.gp / x.ns : 0),
         share:cur.s ? this.pct(x.s / cur.s) : '', shareW:(chMax ? x.s / chMax * 100 : 0).toFixed(1) + '%',
@@ -2043,7 +2043,7 @@ class Component extends DCLogic {
     const regRows = RGE.map(g => {
       const x = cur.reg[g.k], p = prev.reg[g.k];
       return { name:g.n, col:g.c, sales:this.money(x.s), native:g.cur === 'USD' ? '\u2014' : this.fx(x.s, g.cur),
-        orders:this.num(x.o), aov:this.money2(x.o ? (x.s - x.dsc) / x.o : 0), daily:this.money(x.s / Math.max(1, cur.ds.length)),
+        orders:this.num(x.o), aov:this.money2(x.aovO ? x.aovS / x.aovO : 0), daily:this.money(x.s / Math.max(1, cur.ds.length)),
         share:cur.s ? this.pct(x.s / cur.s) : '', shareW:(rgMax ? x.s / rgMax * 100 : 0).toFixed(1) + '%',
         ...this.delta(x.s, p.s), ...contrib(x.s, p.s) };
     });

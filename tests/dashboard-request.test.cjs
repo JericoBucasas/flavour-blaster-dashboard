@@ -11,7 +11,7 @@ test('parseDate accepts ISO dates and falls back safely', () => {
 
 test('snapshot request keeps the secret in server headers only', () => {
   const request = buildSnapshotRequest('https://hnmmlfelaezmijbbwzsg.supabase.co/', '[test-secret]', '2025-01-01', '2026-08-20');
-  assert.equal(request.url, 'https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/rpc/fb_dashboard_snapshot_v3');
+  assert.equal(request.url, 'https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/rpc/fb_dashboard_snapshot_v4');
   assert.equal(request.options.headers.apikey, '[test-secret]');
   assert.equal(request.options.headers.Authorization, undefined);
   assert.equal(request.options.headers['User-Agent'], 'FlavourBlasterDashboard-Vercel/1.0');

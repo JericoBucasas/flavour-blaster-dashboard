@@ -62,6 +62,22 @@ test('explicit Shopify net sales preserve sales reversals not present in refunds
   assert.equal(result.days[0].cr.d2c[2].dsc, 705.43);
 });
 
+test('explicit AOV sales remain separate from post-order gross sales adjustments', () => {
+  const result = runtime().normalize({
+    daily:[{
+      day:'2026-08-20', channel:'shopify_d2c', region_code:'gb', orders:2,
+      gross_sales:220, discounts:20, aov_sales:150, aov_orders:2,
+      net_sales:200, units:3,
+    }],
+    hourly:[],
+  }, channels, regions);
+  assert.equal(result.days[0].aovS, 150);
+  assert.equal(result.days[0].aovO, 2);
+  assert.equal(result.days[0].ch.d2c.aovS, 150);
+  assert.equal(result.days[0].reg.gb.aovS, 150);
+  assert.equal(result.days[0].cr.d2c[2].aovS, 150);
+});
+
 test('live loader scopes the request to the active dashboard section', async () => {
   let requestedUrl = '';
   const context = {
