@@ -13,10 +13,8 @@ test('dashboard has one update lifecycle and loads continuous sections separatel
   assert.doesNotMatch(source, /\? 'all' : this\.state\.view/);
   assert.match(source, /alignToLatest/);
   assert.match(source, /rangeKey:coverageEndMs === this\.NOW - this\.D \? 'yesterday' : 'custom'/);
-  assert.match(source, /const requestStart = compareOn \? Math\.min\(st\.start, previousStart\) : st\.start/);
-  assert.match(source, /const rangeChanged = prevState\.start !== st\.start/);
-  assert.match(source, /if \(requestKey !== this\.liveRequestRange\(this\.state\)\.requestKey\)/);
-  assert.doesNotMatch(source, /const requestIsStale/);
+  assert.match(source, /const start = '2019-01-01'/);
+  assert.doesNotMatch(source, /const rangeChanged = prevState\.start !== st\.start/);
   assert.match(source, /Shopify-authoritative financials/);
   assert.match(source, /c\.k === 'd2c' \|\| c\.k === 'b2b'/);
   assert.doesNotMatch(source, /d2c:true, b2b:true, amzus:true, amzuk:true/);

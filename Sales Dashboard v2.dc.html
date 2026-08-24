@@ -1422,7 +1422,7 @@ class Component extends DCLogic {
         locations:{ name:true, company:true, region:true, orders:true, spend:true, lastOrder:false, paymentTerms:false, catalogs:false, tax:false, currency:false },
       },
       brandName:ls.brandV >= 3 && ls.brandName ? ls.brandName : 'Flavour Blaster', brandTag:ls.brandV >= 3 && ls.brandTag ? ls.brandTag : 'The Art of Aroma, Perfected!', logoData:ls.brandV >= 3 && ls.logoData ? ls.logoData : './assets/flavour-blaster-b.jpeg', growthO:ls.growthO ?? null, coverO:ls.coverO ?? null, retO:ls.retO ?? null, areaO:ls.areaO ?? null, dataMode:'live', dataUrl:'/api/dashboard',
-      dataStatus:'loading', dataError:null, dataUpdatedAt:null, dataCoverageStart:null, dataCoverageEnd:null, dataBaseCurrency:null, dataRequestKey:null, shopifyReconciliation:null, livePayload:null,
+      dataStatus:'loading', dataError:null, dataUpdatedAt:null, dataCoverageStart:null, dataCoverageEnd:null, dataBaseCurrency:null, shopifyReconciliation:null, livePayload:null,
       repCur:ls.repCur || 'USD', fxAuto:ls.fxAuto ?? true, fxFetched:null, targetMode:ls.targetMode || 'growth', targetAbs:ls.targetAbs ?? null, chCfg:ls.chCfg || {}, rgCfg:ls.rgCfg || {},
       flagsOn:ls.flagsOn || {}, agingDays:ls.agingDays || 2, anomSens:ls.anomSens || 'med', density:ls.density || 'comfortable', contentW:[1200,1400,1600,2000].includes(ls.contentW) ? ls.contentW : 1200,
       kpiOn:ls.kpiOn || {}, kpiOrder:ls.kpiOrder || null, defView:ls.defView || null, defRange:ls.defRange || null, defCmp:ls.defCmp || null,
@@ -1454,26 +1454,6 @@ class Component extends DCLogic {
     this.loadLiveData();
   }
   componentWillUnmount() { window.removeEventListener('keydown', this._keys); }
-  liveRequestRange(st = this.state) {
-      const D = this.D;
-      const span = st.end - st.start + D;
-      let previousStart = st.start - span, previousEnd = st.start - D;
-      if (st.cmpMode === 'py') {
-        const sd = new Date(st.start), ed = new Date(st.end);
-        previousStart = Date.UTC(sd.getUTCFullYear() - 1, sd.getUTCMonth(), sd.getUTCDate());
-        previousEnd = Date.UTC(ed.getUTCFullYear() - 1, ed.getUTCMonth(), ed.getUTCDate());
-      } else if (st.cmpMode === 'pydow') {
-        previousStart = st.start - 364 * D; previousEnd = st.end - 364 * D;
-      } else if (st.cmpMode === 'custom' && st.cmpS != null) {
-        previousStart = st.cmpS; previousEnd = st.cmpE ?? st.cmpS;
-      }
-      const compareOn = st.cmpMode !== 'none';
-      const requestStart = compareOn ? Math.min(st.start, previousStart) : st.start;
-      const requestEnd = compareOn ? Math.max(st.end, previousEnd) : st.end;
-      const start = new Date(requestStart).toISOString().slice(0, 10);
-      const end = new Date(requestEnd).toISOString().slice(0, 10);
-      return { start, end, requestKey:start + ':' + end };
-  }
   async loadLiveData() {
     if (!window.FlavourBlasterLive) {
       this.days = [];
@@ -1482,21 +1462,18 @@ class Component extends DCLogic {
     }
     this.setState({ dataStatus:'loading', dataError:null });
     try {
-      const { start, end, requestKey } = this.liveRequestRange(this.state);
+      const start = '2019-01-01';
+      const end = new Date(this.NOW).toISOString().slice(0, 10);
       const sections = this.state.continuous ? ['overview','products','customers'] : [this.state.view];
-      let payload = this.state.dataRequestKey === requestKey ? { ...(this.state.livePayload || {}) } : {};
+      let payload = { ...(this.state.livePayload || {}) };
       for (const section of sections) {
         const loadedPayload = await window.FlavourBlasterLive.load('/api/dashboard', start, end, section);
         payload = { ...payload, ...loadedPayload };
       }
-      if (requestKey !== this.liveRequestRange(this.state).requestKey) {
-        this.loadLiveData();
-        return;
-      }
       const normalized = window.FlavourBlasterLive.normalize(payload, this.CH, this.RG);
       if (!normalized.hasLiveData) {
         this.days = [];
-        this.setState({ dataStatus:'empty', livePayload:payload, dataRequestKey:requestKey, dataUpdatedAt:payload.sourceLastUpdatedAt || payload.generatedAt || null,
+        this.setState({ dataStatus:'empty', livePayload:payload, dataUpdatedAt:payload.sourceLastUpdatedAt || payload.generatedAt || null,
           dataCoverageStart:payload.coverageStart || null, dataCoverageEnd:payload.coverageEnd || null });
         return;
       }
@@ -1508,7 +1485,7 @@ class Component extends DCLogic {
         isFinite(coverageEndMs) && coverageEndMs < this.NOW;
       if (isFinite(coverageEndMs)) this._alignedToCoverage = true;
       const shopifyReconciliation = payload.shopifyReconciliation || null;
-      this.setState({ dataStatus:'live', livePayload:payload, dataRequestKey:requestKey, dataUpdatedAt:shopifyReconciliation?.lastSuccessAt || payload.sync?.last_success_at || payload.sourceLastUpdatedAt || payload.generatedAt || null,
+      this.setState({ dataStatus:'live', livePayload:payload, dataUpdatedAt:shopifyReconciliation?.lastSuccessAt || payload.sync?.last_success_at || payload.sourceLastUpdatedAt || payload.generatedAt || null,
         dataCoverageStart:payload.coverageStart || null, dataCoverageEnd:coverageEnd, dataBaseCurrency:baseCurrency, shopifyReconciliation,
         ...(alignToLatest ? { rangeKey:coverageEndMs === this.NOW - this.D ? 'yesterday' : 'custom', start:coverageEndMs, end:coverageEndMs } : {}) });
     } catch (error) {
@@ -1519,11 +1496,6 @@ class Component extends DCLogic {
   componentDidUpdate(prevState) {
     const st = this.state;
     const viewChanged = prevState.view !== st.view || prevState.continuous !== st.continuous;
-    const rangeChanged = prevState.start !== st.start || prevState.end !== st.end || prevState.cmpMode !== st.cmpMode || prevState.cmpS !== st.cmpS || prevState.cmpE !== st.cmpE;
-    if (rangeChanged && st.dataStatus !== 'loading') {
-      this.loadLiveData();
-      return;
-    }
     const liveRequestFinished = prevState.dataStatus === 'loading' && st.dataStatus === 'live';
     const needsProducts = st.view === 'products' && !st.livePayload?.productCatalog;
     const needsCustomers = st.view === 'customers' && !st.livePayload?.customerDirectory;
