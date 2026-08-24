@@ -104,3 +104,27 @@ test('Shopify AOV uses the original order state including immediate finalization
   assert.match(source, /'aov_source', 'shopify_original_order_state'/);
   assert.match(source, /grant execute on function public\.fb_dashboard_snapshot_v7\(date, date\) to service_role/);
 });
+
+test('Shopify B2B classification uses purchasing company, company membership, and qualifying tags', () => {
+  const source = fs.readFileSync('supabase/migrations/202608240007_shopify_b2b_classification.sql', 'utf8');
+  assert.match(source, /purchasingcompany/);
+  assert.match(source, /wholesale\|distributor\|b2b/);
+  assert.match(source, /from public\.fb_company_contacts contact/);
+  assert.match(source, /join public\.fb_companies company/);
+  assert.match(source, /new\.source_store = 'jetchill-mixology'/);
+  assert.match(source, /new\.channel := case/);
+  assert.match(source, /b2b_classification_reasons/);
+  assert.match(source, /revoke all on function public\.fb_shopify_b2b_reasons/);
+  assert.match(source, /grant execute on function public\.fb_shopify_b2b_reasons/);
+});
+
+test('Shopify B2B classification refreshes historical orders after directory changes', () => {
+  const source = fs.readFileSync('supabase/migrations/202608240008_shopify_b2b_dependency_refresh.sql', 'utf8');
+  assert.match(source, /create trigger fb_customers_reclassify_shopify_orders/);
+  assert.match(source, /create trigger fb_company_contacts_reclassify_shopify_orders/);
+  assert.match(source, /create trigger fb_companies_reclassify_shopify_orders/);
+  assert.match(source, /set channel = orders\.channel/);
+  assert.match(source, /orders\.source_store = 'jetchill-mixology'/);
+  assert.match(source, /revoke all on function public\.fb_reclassify_shopify_customer_orders/);
+  assert.match(source, /grant execute on function public\.fb_reclassify_shopify_company_orders/);
+});
