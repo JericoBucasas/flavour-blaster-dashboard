@@ -28,10 +28,15 @@ test('catalog request keeps the secret server-side and targets the catalog RPC',
 
 test('directory request keeps the secret server-side and targets the safe directory RPC', () => {
   const request = buildDirectoryRequest('https://hnmmlfelaezmijbbwzsg.supabase.co/', '[test-secret]');
-  assert.equal(request.url, 'https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/rpc/fb_customer_company_directory');
+  assert.equal(request.url, 'https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/rpc/fb_customer_company_directory_page');
   assert.equal(request.options.headers.apikey, '[test-secret]');
   assert.equal(request.options.headers.Authorization, undefined);
-  assert.equal(request.options.body, '{}');
+  assert.deepEqual(JSON.parse(request.options.body), { p_limit:500 });
+});
+
+test('directory request clamps the server-side page size', () => {
+  const request = buildDirectoryRequest('https://hnmmlfelaezmijbbwzsg.supabase.co/', '[test-secret]', 5000);
+  assert.deepEqual(JSON.parse(request.options.body), { p_limit:500 });
 });
 
 test('snapshot response redacts customer and order identifiers', () => {

@@ -72,7 +72,7 @@ test('dashboard API merges sales, product catalog, and customer company director
   };
   try {
     const res = response();
-    await handler({ method:'GET', query:{ start:'2026-08-01', end:'2026-08-20' } }, res);
+    await handler({ method:'GET', query:{ start:'2026-08-01', end:'2026-08-20', section:'all' } }, res);
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.status, 'live');
     assert.equal(res.body.data.productCatalog.summary.products, 173);
@@ -100,7 +100,7 @@ test('dashboard API rejects an invalid customer directory payload', async () => 
   };
   try {
     const res = response();
-    await handler({ method:'GET', query:{} }, res);
+    await handler({ method:'GET', query:{ section:'all' } }, res);
     assert.equal(res.statusCode, 502);
     assert.equal(res.body.code, 'CUSTOMER_DIRECTORY_INVALID');
   } finally {
@@ -110,39 +110,45 @@ test('dashboard API rejects an invalid customer directory payload', async () => 
   }
 });
 
-test('dashboard API bounds directory rows while preserving complete totals', async () => {
+test('dashboard API preserves the database-bounded directory page and complete totals', async () => {
   const previousUrl = process.env.SUPABASE_URL;
   const previousKey = process.env.SUPABASE_SECRET_KEY;
   const previousFetch = global.fetch;
   process.env.SUPABASE_URL = 'https://hnmmlfelaezmijbbwzsg.supabase.co';
   process.env.SUPABASE_SECRET_KEY = '[test-secret]';
-  const customers = Array.from({ length: 501 }, (_, index) => ({ key: `customer-${index}` }));
-  const companies = Array.from({ length: 501 }, (_, index) => ({ key: `company-${index}` }));
-  const locations = Array.from({ length: 501 }, (_, index) => ({ key: `location-${index}` }));
+  const customers = Array.from({ length: 500 }, (_, index) => ({ key: `customer-${index}` }));
+  const companies = Array.from({ length: 399 }, (_, index) => ({ key: `company-${index}` }));
+  const locations = Array.from({ length: 500 }, (_, index) => ({ key: `location-${index}` }));
   const fetchCalls = [
     { ok:true, json:async () => ({ recentOrders: [] }) },
     { ok:true, json:async () => ({ products: [] }) },
-    { ok:true, json:async () => ({ summary: { customers: 29405, companies: 399, locations: 934 }, customers, companies, locations }) },
+    { ok:true, json:async () => ({
+      summary: { customers: 29405, companies: 399, locations: 934 },
+      pageInfo: { pageSize:500, customersReturned:500, companiesReturned:399, locationsReturned:500,
+        customersTotal:29405, companiesTotal:399, locationsTotal:934 },
+      customers, companies, locations,
+    }) },
   ];
   global.fetch = async () => fetchCalls.shift();
   try {
     const res = response();
-    await handler({ method:'GET', query:{} }, res);
+    await handler({ method:'GET', query:{ section:'all' } }, res);
 
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.data.customerDirectory.customers.length, 500);
-    assert.equal(res.body.data.customerDirectory.companies.length, 500);
+    assert.equal(res.body.data.customerDirectory.companies.length, 399);
     assert.equal(res.body.data.customerDirectory.locations.length, 500);
     assert.equal(res.body.data.customerDirectory.summary.customers, 29405);
     assert.deepEqual(res.body.data.customerDirectory.pageInfo, {
       pageSize: 500,
       customersReturned: 500,
-      companiesReturned: 500,
+      companiesReturned: 399,
       locationsReturned: 500,
       customersTotal: 29405,
       companiesTotal: 399,
       locationsTotal: 934,
     });
+    assert.equal(res.headers['Cache-Control'], 'private, no-store, max-age=0');
   } finally {
     global.fetch = previousFetch;
     if (previousUrl == null) delete process.env.SUPABASE_URL; else process.env.SUPABASE_URL = previousUrl;

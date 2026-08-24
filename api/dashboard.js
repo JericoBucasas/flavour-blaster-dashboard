@@ -19,7 +19,7 @@ module.exports = async function dashboard(req, res) {
   }
   if (start > end) return res.status(400).json({ status: 'error', code: 'INVALID_RANGE' });
 
-  const section = String(req.query && req.query.section || 'all').toLowerCase();
+  const section = String(req.query && req.query.section || 'overview').toLowerCase();
   const validSections = new Set(['all', 'overview', 'channels', 'regions', 'orders', 'products', 'customers', 'ads', 'settings']);
   if (!validSections.has(section)) return res.status(400).json({ status: 'error', code: 'INVALID_SECTION' });
   const needsCatalog = section === 'all' || section === 'products';
@@ -32,7 +32,7 @@ module.exports = async function dashboard(req, res) {
   try {
     request = buildSnapshotRequest(process.env.SUPABASE_URL, secretKey, start, end);
     if (needsCatalog) catalogRequest = buildCatalogRequest(process.env.SUPABASE_URL, secretKey);
-    if (needsDirectory) directoryRequest = buildDirectoryRequest(process.env.SUPABASE_URL, secretKey);
+    if (needsDirectory) directoryRequest = buildDirectoryRequest(process.env.SUPABASE_URL, secretKey, 500);
   } catch (_error) {
     return res.status(503).json({ status: 'unavailable', code: 'DATASTORE_NOT_CONFIGURED' });
   }
@@ -43,7 +43,15 @@ module.exports = async function dashboard(req, res) {
     if (directoryRequest) requests.push(fetch(directoryRequest.url, directoryRequest.options));
     const responses = await Promise.all(requests);
     const bodies = await Promise.all(responses.map((upstream) => upstream.json().catch(() => null)));
-    if (responses.some((upstream) => !upstream.ok)) {
+    const failedIndex = responses.findIndex((upstream) => !upstream.ok);
+    if (failedIndex >= 0) {
+      const sourceNames = ['snapshot'];
+      if (catalogRequest) sourceNames.push('catalog');
+      if (directoryRequest) sourceNames.push('directory');
+      console.error('[api/dashboard] Supabase RPC failed', {
+        source: sourceNames[failedIndex] || 'unknown',
+        status: responses[failedIndex].status,
+      });
       return res.status(502).json({ status: 'error', code: 'DATASTORE_QUERY_FAILED' });
     }
     const body = bodies[0];
@@ -65,32 +73,17 @@ module.exports = async function dashboard(req, res) {
         || !Array.isArray(customerDirectory.companies) || !Array.isArray(customerDirectory.locations)) {
         return res.status(502).json({ status: 'error', code: 'CUSTOMER_DIRECTORY_INVALID' });
       }
-      // Keep the complete directory in Supabase, but do not push tens of thousands of
-      // records into one browser render. The summary retains the complete counts while
-      // the dashboard receives a representative, usable first page for each directory.
-      const directoryPageSize = 500;
-      boundedCustomerDirectory = {
-        ...customerDirectory,
-        customers: customerDirectory.customers.slice(0, directoryPageSize),
-        companies: customerDirectory.companies.slice(0, directoryPageSize),
-        locations: customerDirectory.locations.slice(0, directoryPageSize),
-        pageInfo: {
-          pageSize: directoryPageSize,
-          customersReturned: Math.min(customerDirectory.customers.length, directoryPageSize),
-          companiesReturned: Math.min(customerDirectory.companies.length, directoryPageSize),
-          locationsReturned: Math.min(customerDirectory.locations.length, directoryPageSize),
-          customersTotal: Number(customerDirectory.summary && customerDirectory.summary.customers) || customerDirectory.customers.length,
-          companiesTotal: Number(customerDirectory.summary && customerDirectory.summary.companies) || customerDirectory.companies.length,
-          locationsTotal: Number(customerDirectory.summary && customerDirectory.summary.locations) || customerDirectory.locations.length,
-        },
-      };
+      boundedCustomerDirectory = customerDirectory;
     }
     const responseData = { ...data };
     if (productCatalog) responseData.productCatalog = productCatalog;
     if (boundedCustomerDirectory) responseData.customerDirectory = boundedCustomerDirectory;
-    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
     return res.status(200).json({ status: 'live', data:responseData });
-  } catch (_error) {
+  } catch (error) {
+    console.error('[api/dashboard] Datastore request failed', {
+      message: error && error.message ? error.message : String(error),
+    });
     return res.status(502).json({ status: 'error', code: 'DATASTORE_UNREACHABLE' });
   }
 };
