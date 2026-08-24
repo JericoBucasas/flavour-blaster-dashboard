@@ -15,7 +15,7 @@ test('dashboard loads only the selected and comparison ranges without reload loo
   assert.match(source, /rangeKey:coverageEndMs === this\.NOW - this\.D \? 'yesterday' : 'custom'/);
   assert.match(source, /liveBounds\(st = this\.state\)/);
   assert.match(source, /const rangeChanged = prevState\.start !== st\.start/);
-  assert.match(source, /this\._liveRequestKey === requestKey/);
+  assert.match(source, /this\.state\.dataRequestKey === requestKey/);
   assert.match(source, /FlavourBlasterLive\.loadRange/);
   assert.doesNotMatch(source, /const start = '2019-01-01'/);
   assert.match(source, /Shopify-authoritative financials/);

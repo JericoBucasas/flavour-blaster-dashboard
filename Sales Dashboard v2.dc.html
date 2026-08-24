@@ -1422,7 +1422,7 @@ class Component extends DCLogic {
         locations:{ name:true, company:true, region:true, orders:true, spend:true, lastOrder:false, paymentTerms:false, catalogs:false, tax:false, currency:false },
       },
       brandName:ls.brandV >= 3 && ls.brandName ? ls.brandName : 'Flavour Blaster', brandTag:ls.brandV >= 3 && ls.brandTag ? ls.brandTag : 'The Art of Aroma, Perfected!', logoData:ls.brandV >= 3 && ls.logoData ? ls.logoData : './assets/flavour-blaster-b.jpeg', growthO:ls.growthO ?? null, coverO:ls.coverO ?? null, retO:ls.retO ?? null, areaO:ls.areaO ?? null, dataMode:'live', dataUrl:'/api/dashboard',
-      dataStatus:'loading', dataError:null, dataUpdatedAt:null, dataCoverageStart:null, dataCoverageEnd:null, dataBaseCurrency:null, shopifyReconciliation:null, livePayload:null,
+      dataStatus:'loading', dataError:null, dataRequestKey:null, dataUpdatedAt:null, dataCoverageStart:null, dataCoverageEnd:null, dataBaseCurrency:null, shopifyReconciliation:null, livePayload:null,
       repCur:ls.repCur || 'USD', fxAuto:ls.fxAuto ?? true, fxFetched:null, targetMode:ls.targetMode || 'growth', targetAbs:ls.targetAbs ?? null, chCfg:ls.chCfg || {}, rgCfg:ls.rgCfg || {},
       flagsOn:ls.flagsOn || {}, agingDays:ls.agingDays || 2, anomSens:ls.anomSens || 'med', density:ls.density || 'comfortable', contentW:[1200,1400,1600,2000].includes(ls.contentW) ? ls.contentW : 1200,
       kpiOn:ls.kpiOn || {}, kpiOrder:ls.kpiOrder || null, defView:ls.defView || null, defRange:ls.defRange || null, defCmp:ls.defCmp || null,
@@ -1473,9 +1473,8 @@ class Component extends DCLogic {
     const bounds = this.liveBounds();
     const sections = this.state.continuous ? ['overview','products','customers'] : [this.state.view];
     const requestKey = bounds.start + '|' + bounds.end + '|' + sections.join(',');
-    if (this._liveRequestKey === requestKey) return;
-    this._liveRequestKey = requestKey;
-    this.setState({ dataStatus:'loading', dataError:null });
+    if (this.state.dataRequestKey === requestKey && this.state.dataStatus !== 'error' && this.state.dataStatus !== 'empty') return;
+    this.setState({ dataStatus:'loading', dataError:null, dataRequestKey:requestKey });
     try {
       let payload = { ...(this.state.livePayload || {}) };
       for (const section of sections) {
@@ -1501,7 +1500,6 @@ class Component extends DCLogic {
         dataCoverageStart:payload.coverageStart || null, dataCoverageEnd:coverageEnd, dataBaseCurrency:baseCurrency, shopifyReconciliation,
         ...(alignToLatest ? { rangeKey:coverageEndMs === this.NOW - this.D ? 'yesterday' : 'custom', start:coverageEndMs, end:coverageEndMs } : {}) });
     } catch (error) {
-      this._liveRequestKey = null;
       this.days = [];
       this.setState({ dataStatus:'error', dataError:error && error.message ? error.message : 'LIVE_DATA_UNAVAILABLE' });
     }
@@ -1511,7 +1509,7 @@ class Component extends DCLogic {
     const rangeChanged = prevState.start !== st.start || prevState.end !== st.end || prevState.cmpMode !== st.cmpMode || prevState.cmpS !== st.cmpS || prevState.cmpE !== st.cmpE;
     if (rangeChanged) {
       clearTimeout(this._liveRangeTimer);
-      this._liveRangeTimer = setTimeout(() => { this._liveRequestKey = null; this.loadLiveData(); }, 120);
+      this._liveRangeTimer = setTimeout(() => this.loadLiveData(), 120);
     }
     const viewChanged = prevState.view !== st.view || prevState.continuous !== st.continuous;
     const liveRequestFinished = prevState.dataStatus === 'loading' && st.dataStatus === 'live';
