@@ -33,3 +33,9 @@ test('AOV snapshot uses initial order sales and keeps draft-order completion edi
   assert.match(source, /revoke all on function public\.fb_dashboard_snapshot_v4/);
   assert.match(source, /grant execute on function public\.fb_dashboard_snapshot_v4\(date, date\) to service_role/);
 });
+
+test('dashboard uses Shopify-compatible two-decimal presentation for AOV', () => {
+  const source = fs.readFileSync('Sales Dashboard v2.dc.html', 'utf8');
+  assert.match(source, /money2Aov\(v\).*Math\.trunc/s);
+  assert.match(source, /Average order value', val:this\.money2Aov\(cAov\)/);
+});

@@ -1688,6 +1688,7 @@ class Component extends DCLogic {
   rc() { const c = (this.state && this.state.repCur) || 'USD'; const base = (this.state && this.state.dataBaseCurrency) || 'USD'; const d = this.FX[c] || this.FX.USD; const b = this.FX[base] || this.FX.USD; return { r:d[0] / b[0], s:d[1] }; }
   money(v) { const { r, s } = this.rc(); return s + Math.round(v * r).toLocaleString('en-US'); }
   money2(v) { const { r, s } = this.rc(); return s + (v * r).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 }); }
+  money2Aov(v) { const { r, s } = this.rc(); const n = Math.trunc((v * r + 1e-9) * 100) / 100; return s + n.toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 }); }
   signedMoney2(v) { const { r, s } = this.rc(); const n = v * r; return (n < 0 ? '\u2212' : '') + s + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 }); }
   fx(v, cur) { const [rate, sym] = this.FX[cur] || this.FX.USD; return sym + Math.round(v * rate).toLocaleString('en-US'); }
   num(v) { return Math.round(v).toLocaleString('en-US'); }
@@ -1883,7 +1884,7 @@ class Component extends DCLogic {
       { k:'gross', label:'Gross sales', val:this.money(cur.s), ...this.delta(cur.s, prev.s), ...this.sparks(cur, prev, d => d.s) },
       { k:'net', label:'Net sales', val:this.money(cur.ns), ...this.delta(cur.ns, prev.ns), ...this.sparks(cur, prev, d => d.ns) },
       { k:'orders', label:'Orders', val:this.num(cur.o), ...this.delta(cur.o, prev.o), ...this.sparks(cur, prev, d => d.o) },
-      { k:'aov', label:'Average order value', val:this.money2(cAov), ...this.delta(cAov, pAov), ...this.sparks(cur, prev, d => d.aovO ? d.aovS / d.aovO : 0, null, true) },
+      { k:'aov', label:'Average order value', val:this.money2Aov(cAov), ...this.delta(cAov, pAov), ...this.sparks(cur, prev, d => d.aovO ? d.aovS / d.aovO : 0, null, true) },
       st.dataStatus === 'live' ? { k:'conv', label:'Conversion rate', val:'—', delta:'Sessions not connected', dcol:'inherit', spark:'', spark2:'' } : { k:'conv', label:'Conversion rate', val:this.pct(cConv, 2), ...this.delta(cConv, pConv), ...this.sparks(cur, prev, d => d.v ? d.o / d.v : 0, null, true) },
       st.dataStatus === 'live' && !liveCostAvailable ? { k:'margin', label:'Gross margin', val:'—', delta:'Product cost unavailable', dcol:'inherit', spark:'', spark2:'' } : { k:'margin', label:'Gross margin', val:this.pct(cMar), ...this.delta(cMar, pMar), ...this.sparks(cur, prev, d => d.ns ? d.gp / d.ns : 0, null, true) },
       { k:'disc', label:'Discount rate', val:this.pct(cDisc), ...this.delta(cDisc, pDisc, true), ...this.sparks(cur, prev, d => d.s ? d.dsc / d.s : 0, A2, true) },
@@ -1938,7 +1939,7 @@ class Component extends DCLogic {
       gross:['Total sales over time', d => d.s, km, m2, true],
       net:['Net sales over time', d => d.ns, km, m2, true],
       orders:['Orders over time', d => d.o, kn, n2, true],
-      aov:['Average order value over time', d => d.aovO ? d.aovS / d.aovO : 0, v => this.money(v), v => this.money2(v), false],
+      aov:['Average order value over time', d => d.aovO ? d.aovS / d.aovO : 0, v => this.money(v), v => this.money2Aov(v), false],
       conv:['Conversion rate over time', d => d.v ? d.o / d.v : 0, pf, pf2, false],
       margin:['Gross margin over time', d => d.ns ? d.gp / d.ns : 0, pf, pf, false],
       disc:['Discount rate over time', d => d.s ? d.dsc / d.s : 0, pf, pf, false],
@@ -1993,7 +1994,7 @@ class Component extends DCLogic {
       const x = cur.ch[c.k], p = prev.ch[c.k];
       const rr = x.u ? x.rfU / x.u : 0;
       return { name:c.n, col:c.c, sales:this.money(x.s), net:this.money(x.ns), native:c.cur === 'USD' ? '\u2014' : this.fx(x.s, c.cur),
-        orders:this.num(x.o), aov:this.money2(x.aovO ? x.aovS / x.aovO : 0), units:this.num(x.u), sessions:this.num(x.v),
+        orders:this.num(x.o), aov:this.money2Aov(x.aovO ? x.aovS / x.aovO : 0), units:this.num(x.u), sessions:this.num(x.v),
         conv:x.v ? this.pct(x.o / x.v, 2) : '\u2014', discRate:this.pct(x.s ? x.dsc / x.s : 0), retRate:st.dataStatus === 'live' ? '\u2014' : this.pct(rr),
         retCol:rr > retCeil ? 'var(--color-accent-2-700)' : 'inherit', margin:st.dataStatus === 'live' && !liveCostAvailable ? '\u2014' : this.pct(x.ns ? x.gp / x.ns : 0),
         share:cur.s ? this.pct(x.s / cur.s) : '', shareW:(chMax ? x.s / chMax * 100 : 0).toFixed(1) + '%',
@@ -2043,7 +2044,7 @@ class Component extends DCLogic {
     const regRows = RGE.map(g => {
       const x = cur.reg[g.k], p = prev.reg[g.k];
       return { name:g.n, col:g.c, sales:this.money(x.s), native:g.cur === 'USD' ? '\u2014' : this.fx(x.s, g.cur),
-        orders:this.num(x.o), aov:this.money2(x.aovO ? x.aovS / x.aovO : 0), daily:this.money(x.s / Math.max(1, cur.ds.length)),
+        orders:this.num(x.o), aov:this.money2Aov(x.aovO ? x.aovS / x.aovO : 0), daily:this.money(x.s / Math.max(1, cur.ds.length)),
         share:cur.s ? this.pct(x.s / cur.s) : '', shareW:(rgMax ? x.s / rgMax * 100 : 0).toFixed(1) + '%',
         ...this.delta(x.s, p.s), ...contrib(x.s, p.s) };
     });
