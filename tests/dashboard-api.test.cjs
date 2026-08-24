@@ -47,7 +47,7 @@ test('orders section only requests the sales snapshot', async () => {
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.status, 'live');
     assert.equal(requests.length, 1);
-    assert.match(requests[0], /fb_dashboard_snapshot_v4$/);
+    assert.match(requests[0], /fb_dashboard_snapshot_v7$/);
     assert.equal(res.body.data.productCatalog, undefined);
     assert.equal(res.body.data.customerDirectory, undefined);
   } finally {
@@ -66,7 +66,7 @@ test('dashboard API merges sales, product catalog, and customer company director
   const requests = [];
   global.fetch = async (url) => {
     requests.push(url);
-    if (url.endsWith('/fb_dashboard_snapshot_v2')) return { ok:true, json:async () => ({ daily:[], recentOrders:[] }) };
+    if (url.endsWith('/fb_dashboard_snapshot_v7')) return { ok:true, json:async () => ({ daily:[], recentOrders:[] }) };
     if (url.endsWith('/fb_product_catalog')) return { ok:true, json:async () => ({ summary:{ products:173 }, products:[{ title:'Product' }] }) };
     return { ok:true, json:async () => ({ summary:{ customers:243 }, customers:[{ name:'Customer' }], companies:[], locations:[] }) };
   };
@@ -94,7 +94,7 @@ test('dashboard API rejects an invalid customer directory payload', async () => 
   process.env.SUPABASE_URL = 'https://hnmmlfelaezmijbbwzsg.supabase.co';
   process.env.SUPABASE_SECRET_KEY = '[test-secret]';
   global.fetch = async (url) => {
-    if (url.endsWith('/fb_dashboard_snapshot_v2')) return { ok:true, json:async () => ({ daily:[], recentOrders:[] }) };
+    if (url.endsWith('/fb_dashboard_snapshot_v7')) return { ok:true, json:async () => ({ daily:[], recentOrders:[] }) };
     if (url.endsWith('/fb_product_catalog')) return { ok:true, json:async () => ({ products:[] }) };
     return { ok:true, json:async () => ({ customers:[] }) };
   };

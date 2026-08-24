@@ -1277,7 +1277,7 @@
           <input id="lg-set-in" type="file" accept="application/json,.json" onChange="{{ importSettings }}" style="display:none">
           <button type="button" class="btn btn-ghost" onClick="{{ resetAll }}"><i class="ph-duotone ph-arrow-counter-clockwise" style="font-size:14px"></i>Reset all to defaults</button>
         </div>
-        <p style="font-size:13px;opacity:0.65;margin-top:30px;max-width:560px;line-height:1.55;text-wrap:pretty">Settings persist in this browser. Live Shopify data is requested through the protected dashboard API. Deterministic sample data appears only when the live source is empty or unavailable and is always labelled as fallback data.</p>
+        <p style="font-size:13px;opacity:0.65;margin-top:30px;max-width:560px;line-height:1.55;text-wrap:pretty">Settings persist in this browser. Live Shopify data is requested through the protected dashboard API. If Shopify data cannot be loaded, the dashboard shows a clear unavailable status with a retry action.</p>
       </div></section>
     </sc-if>
   </main>
@@ -1422,11 +1422,11 @@ class Component extends DCLogic {
         locations:{ name:true, company:true, region:true, orders:true, spend:true, lastOrder:false, paymentTerms:false, catalogs:false, tax:false, currency:false },
       },
       brandName:ls.brandV >= 3 && ls.brandName ? ls.brandName : 'Flavour Blaster', brandTag:ls.brandV >= 3 && ls.brandTag ? ls.brandTag : 'The Art of Aroma, Perfected!', logoData:ls.brandV >= 3 && ls.logoData ? ls.logoData : './assets/flavour-blaster-b.jpeg', growthO:ls.growthO ?? null, coverO:ls.coverO ?? null, retO:ls.retO ?? null, areaO:ls.areaO ?? null, dataMode:'live', dataUrl:'/api/dashboard',
-      dataStatus:'loading', dataError:null, dataUpdatedAt:null, dataCoverageStart:null, dataCoverageEnd:null, dataBaseCurrency:null, livePayload:null,
+      dataStatus:'loading', dataError:null, dataUpdatedAt:null, dataCoverageStart:null, dataCoverageEnd:null, dataBaseCurrency:null, dataRequestKey:null, shopifyReconciliation:null, livePayload:null,
       repCur:ls.repCur || 'USD', fxAuto:ls.fxAuto ?? true, fxFetched:null, targetMode:ls.targetMode || 'growth', targetAbs:ls.targetAbs ?? null, chCfg:ls.chCfg || {}, rgCfg:ls.rgCfg || {},
       flagsOn:ls.flagsOn || {}, agingDays:ls.agingDays || 2, anomSens:ls.anomSens || 'med', density:ls.density || 'comfortable', contentW:[1200,1400,1600,2000].includes(ls.contentW) ? ls.contentW : 1200,
       kpiOn:ls.kpiOn || {}, kpiOrder:ls.kpiOrder || null, defView:ls.defView || null, defRange:ls.defRange || null, defCmp:ls.defCmp || null,
-      chOn:Object.fromEntries(this.CH.map(c => [c.k, true])), rgOn:Object.fromEntries(this.RG.map(g => [g.k, true])) };
+      chOn:Object.fromEntries(this.CH.map(c => [c.k, c.k === 'd2c' || c.k === 'b2b'])), rgOn:Object.fromEntries(this.RG.map(g => [g.k, true])) };
     this._n = 1;
     this.moveFor = (key2) => (ev) => {
       const r = ev.currentTarget.getBoundingClientRect();
@@ -1437,6 +1437,8 @@ class Component extends DCLogic {
     this._leave = () => this.setState({ hi:null });
   }
   componentDidMount() {
+    // Never present generated sample figures as store data while the live request is pending.
+    this.days = [];
     this._savedJson = this.settingsJson();
     this.applyTheme();
     this.applyAccent();
@@ -1452,23 +1454,45 @@ class Component extends DCLogic {
     this.loadLiveData();
   }
   componentWillUnmount() { window.removeEventListener('keydown', this._keys); }
+  liveRequestRange(st = this.state) {
+      const D = this.D;
+      const span = st.end - st.start + D;
+      let previousStart = st.start - span, previousEnd = st.start - D;
+      if (st.cmpMode === 'py') {
+        const sd = new Date(st.start), ed = new Date(st.end);
+        previousStart = Date.UTC(sd.getUTCFullYear() - 1, sd.getUTCMonth(), sd.getUTCDate());
+        previousEnd = Date.UTC(ed.getUTCFullYear() - 1, ed.getUTCMonth(), ed.getUTCDate());
+      } else if (st.cmpMode === 'pydow') {
+        previousStart = st.start - 364 * D; previousEnd = st.end - 364 * D;
+      } else if (st.cmpMode === 'custom' && st.cmpS != null) {
+        previousStart = st.cmpS; previousEnd = st.cmpE ?? st.cmpS;
+      }
+      const compareOn = st.cmpMode !== 'none';
+      const requestStart = compareOn ? Math.min(st.start, previousStart) : st.start;
+      const requestEnd = compareOn ? Math.max(st.end, previousEnd) : st.end;
+      const start = new Date(requestStart).toISOString().slice(0, 10);
+      const end = new Date(requestEnd).toISOString().slice(0, 10);
+      return { start, end, requestKey:start + ':' + end };
+  }
   async loadLiveData() {
     if (!window.FlavourBlasterLive) {
+      this.days = [];
       this.setState({ dataStatus:'error', dataError:'LIVE_LOADER_MISSING' });
       return;
     }
     this.setState({ dataStatus:'loading', dataError:null });
     try {
-      const end = new Date(this.NOW).toISOString().slice(0, 10);
+      const { start, end, requestKey } = this.liveRequestRange(this.state);
       const sections = this.state.continuous ? ['overview','products','customers'] : [this.state.view];
-      let payload = { ...(this.state.livePayload || {}) };
+      let payload = this.state.dataRequestKey === requestKey ? { ...(this.state.livePayload || {}) } : {};
       for (const section of sections) {
-        const loadedPayload = await window.FlavourBlasterLive.load('/api/dashboard', '2025-01-01', end, section);
+        const loadedPayload = await window.FlavourBlasterLive.load('/api/dashboard', start, end, section);
         payload = { ...payload, ...loadedPayload };
       }
       const normalized = window.FlavourBlasterLive.normalize(payload, this.CH, this.RG);
       if (!normalized.hasLiveData) {
-        this.setState({ dataStatus:'empty', livePayload:payload, dataUpdatedAt:payload.sourceLastUpdatedAt || payload.generatedAt || null,
+        this.days = [];
+        this.setState({ dataStatus:'empty', livePayload:payload, dataRequestKey:requestKey, dataUpdatedAt:payload.sourceLastUpdatedAt || payload.generatedAt || null,
           dataCoverageStart:payload.coverageStart || null, dataCoverageEnd:payload.coverageEnd || null });
         return;
       }
@@ -1479,17 +1503,24 @@ class Component extends DCLogic {
       const alignToLatest = !this._alignedToCoverage && this.state.rangeKey === 'today' &&
         isFinite(coverageEndMs) && coverageEndMs < this.NOW;
       if (isFinite(coverageEndMs)) this._alignedToCoverage = true;
-      this.setState({ dataStatus:'live', livePayload:payload, dataUpdatedAt:payload.sync?.last_success_at || payload.sourceLastUpdatedAt || payload.generatedAt || null,
-        dataCoverageStart:payload.coverageStart || null, dataCoverageEnd:coverageEnd, dataBaseCurrency:baseCurrency,
-        ...(alignToLatest ? { rangeKey:coverageEndMs === this.NOW - this.D ? 'yesterday' : 'custom', start:coverageEndMs, end:coverageEndMs } : {}),
-        chOn:{ ...this.state.chOn, d2c:true, b2b:true, amzus:true, amzuk:true } });
+      const shopifyReconciliation = payload.shopifyReconciliation || null;
+      this.setState({ dataStatus:'live', livePayload:payload, dataRequestKey:requestKey, dataUpdatedAt:shopifyReconciliation?.lastSuccessAt || payload.sync?.last_success_at || payload.sourceLastUpdatedAt || payload.generatedAt || null,
+        dataCoverageStart:payload.coverageStart || null, dataCoverageEnd:coverageEnd, dataBaseCurrency:baseCurrency, shopifyReconciliation,
+        ...(alignToLatest ? { rangeKey:coverageEndMs === this.NOW - this.D ? 'yesterday' : 'custom', start:coverageEndMs, end:coverageEndMs } : {}) });
     } catch (error) {
+      this.days = [];
       this.setState({ dataStatus:'error', dataError:error && error.message ? error.message : 'LIVE_DATA_UNAVAILABLE' });
     }
   }
   componentDidUpdate(prevState) {
     const st = this.state;
     const viewChanged = prevState.view !== st.view || prevState.continuous !== st.continuous;
+    const rangeChanged = prevState.start !== st.start || prevState.end !== st.end || prevState.cmpMode !== st.cmpMode || prevState.cmpS !== st.cmpS || prevState.cmpE !== st.cmpE;
+    const requestIsStale = st.dataStatus === 'live' && st.dataRequestKey !== this.liveRequestRange(st).requestKey;
+    if ((rangeChanged && st.dataStatus !== 'loading') || requestIsStale) {
+      this.loadLiveData();
+      return;
+    }
     const liveRequestFinished = prevState.dataStatus === 'loading' && st.dataStatus === 'live';
     const needsProducts = st.view === 'products' && !st.livePayload?.productCatalog;
     const needsCustomers = st.view === 'customers' && !st.livePayload?.customerDirectory;
@@ -2436,15 +2467,20 @@ class Component extends DCLogic {
     const updatedMs = st.dataUpdatedAt ? Date.parse(st.dataUpdatedAt) : NaN;
     const stale = st.dataStatus === 'live' && Number.isFinite(updatedMs) && Date.now() - updatedMs > 2 * 60 * 60 * 1000;
     const coverage = st.dataCoverageStart && st.dataCoverageEnd ? ' · coverage ' + st.dataCoverageStart + ' to ' + st.dataCoverageEnd : '';
+    const shopifySync = st.shopifyReconciliation || {};
+    const syncSuffix = shopifySync.lastSuccessAt ? ' · financials synced ' + shopifySync.lastSuccessAt : '';
+    const reconciliationIssue = ['outside_coverage','incomplete','syncing'].includes(shopifySync.status);
     const statusMap = st.dataStatus === 'loading'
       ? { label:'Connecting to live Flavour Blaster data…', icon:'ph-circle-notch', color:'var(--color-neutral-700)', bg:'var(--color-neutral-100)', border:'var(--sd-line)' }
+      : st.dataStatus === 'live' && reconciliationIssue
+        ? { label:'Shopify reconciliation in progress' + syncSuffix + coverage, icon:'ph-warning', color:'var(--color-accent-2-700)', bg:'var(--color-accent-2-100)', border:'var(--color-accent-2-300)' }
       : st.dataStatus === 'live' && !stale
-        ? { label:'Live Shopify data' + coverage, icon:'ph-broadcast', color:'var(--color-accent-700)', bg:'var(--color-accent-100)', border:'var(--color-accent-300)' }
+        ? { label:'Shopify-authoritative financials' + syncSuffix + coverage, icon:'ph-broadcast', color:'var(--color-accent-700)', bg:'var(--color-accent-100)', border:'var(--color-accent-300)' }
         : st.dataStatus === 'live'
           ? { label:'Stale live data — last successful refresh ' + (st.dataUpdatedAt || 'unknown') + coverage, icon:'ph-warning', color:'var(--color-accent-2-700)', bg:'var(--color-accent-2-100)', border:'var(--color-accent-2-300)' }
           : st.dataStatus === 'empty'
-            ? { label:'Sample fallback — no Shopify records have been imported yet', icon:'ph-flask', color:'var(--color-accent-2-700)', bg:'var(--color-accent-2-100)', border:'var(--color-accent-2-300)' }
-            : { label:'Sample fallback — live data is unavailable', icon:'ph-cloud-slash', color:'var(--color-accent-2-700)', bg:'var(--color-accent-2-100)', border:'var(--color-accent-2-300)' };
+            ? { label:'No Shopify records for the selected date range', icon:'ph-calendar-x', color:'var(--color-accent-2-700)', bg:'var(--color-accent-2-100)', border:'var(--color-accent-2-300)' }
+            : { label:'Shopify data is temporarily unavailable — retry', icon:'ph-cloud-slash', color:'var(--color-accent-2-700)', bg:'var(--color-accent-2-100)', border:'var(--color-accent-2-300)' };
     return {
       navItems, flags:flags.map(f => ({ ...f, goBell:() => { this.setState({ bellOpen:false }); f.go(); } })), briefL, pnl, anomalyFeed, hasAnoms, amzRows, hasAmz, exportCsv,
       dataStatusLabel:statusMap.label, dataStatusIcon:statusMap.icon, dataStatusColor:statusMap.color, dataStatusBg:statusMap.bg, dataStatusBorder:statusMap.border,
@@ -2481,7 +2517,7 @@ class Component extends DCLogic {
         return { label, bd:act ? 'var(--color-accent-500)' : 'var(--sd-line)', bg:act ? 'var(--color-accent-100)' : 'transparent', col:act ? 'var(--color-accent-800)' : 'inherit', wt:act ? '600' : '400',
           click:() => { const [s, e] = this.presetRange(k); this.setState({ rangeKey:k, start:s, end:e, dS:null, dE:null, hi:null }); } };
       }),
-      fsReset:() => { const [s, e] = this.presetRange('today'); this.setState({ rangeKey:'today', start:s, end:e, cmpMode:'prev', compare:true, chOn:Object.fromEntries(this.CH.map(c => [c.k, true])), rgOn:Object.fromEntries(this.RG.map(g => [g.k, true])), hi:null }); },
+      fsReset:() => { const [s, e] = this.presetRange('today'); this.setState({ rangeKey:'today', start:s, end:e, cmpMode:'prev', compare:true, chOn:Object.fromEntries(this.CH.map(c => [c.k, c.k === 'd2c' || c.k === 'b2b'])), rgOn:Object.fromEntries(this.RG.map(g => [g.k, true])), hi:null }); },
       fsSummary:rangeLabel + compareNote + ' \u00b7 ' + CHE.length + '/' + this.CH.length + ' channels \u00b7 ' + RGE.length + '/' + this.RG.length + ' regions',
       bottomNav:navItems.filter(n => ['Overview','Orders','Products'].includes(n.label)),
       menuNav:navItems.filter(n => !['Overview','Orders','Products'].includes(n.label)),
