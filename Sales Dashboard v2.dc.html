@@ -1489,6 +1489,10 @@ class Component extends DCLogic {
         const loadedPayload = await window.FlavourBlasterLive.load('/api/dashboard', start, end, section);
         payload = { ...payload, ...loadedPayload };
       }
+      if (requestKey !== this.liveRequestRange(this.state).requestKey) {
+        this.loadLiveData();
+        return;
+      }
       const normalized = window.FlavourBlasterLive.normalize(payload, this.CH, this.RG);
       if (!normalized.hasLiveData) {
         this.days = [];
@@ -1516,8 +1520,7 @@ class Component extends DCLogic {
     const st = this.state;
     const viewChanged = prevState.view !== st.view || prevState.continuous !== st.continuous;
     const rangeChanged = prevState.start !== st.start || prevState.end !== st.end || prevState.cmpMode !== st.cmpMode || prevState.cmpS !== st.cmpS || prevState.cmpE !== st.cmpE;
-    const requestIsStale = st.dataStatus === 'live' && st.dataRequestKey !== this.liveRequestRange(st).requestKey;
-    if ((rangeChanged && st.dataStatus !== 'loading') || requestIsStale) {
+    if (rangeChanged && st.dataStatus !== 'loading') {
       this.loadLiveData();
       return;
     }
