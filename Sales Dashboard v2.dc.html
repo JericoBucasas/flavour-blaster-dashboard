@@ -54,6 +54,8 @@
     a:hover { color: var(--color-accent-800); }
     .sd-card { background: var(--sd-card); border: 1px solid var(--sd-line); border-radius: 12px; padding: 16px 18px; box-shadow: var(--sd-sh); margin-top: 16px; min-width: 0; }
     .sd-card-h { font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+    .sd-date-btn { flex:none;white-space:nowrap;font-variant-numeric:tabular-nums; }
+    .sd-date-btn-label { display:inline-block;white-space:nowrap; }
     .sd-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     .sd-kpis > div { padding: 12px 14px 11px; position: relative; }
     .customer-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -355,7 +357,7 @@
             </sc-if>
           </div>
         </sc-for>
-        <button type="button" class="btn btn-secondary" onClick="{{ openPicker }}"><i class="ph-duotone ph-calendar-blank" style="font-size:16px"></i>{{ dateBtnLabel }}<i class="ph-duotone ph-caret-down" style="font-size:12px;opacity:0.6"></i></button>
+        <button type="button" class="btn btn-secondary sd-date-btn" onClick="{{ openPicker }}"><i class="ph-duotone ph-calendar-blank" style="font-size:16px;flex:none"></i><span class="sd-date-btn-label">{{ dateBtnLabel }}</span><i class="ph-duotone ph-caret-down" style="font-size:12px;opacity:0.6;flex:none"></i></button>
         <div style="position:relative">
           <button type="button" class="btn {{ compClass }}" onClick="{{ cmpToggle }}"><i class="ph-duotone ph-arrows-left-right" style="font-size:15px"></i><span class="m-hide">{{ cmpLabel }}</span><span class="m-only">{{ cmpLabelShort }}</span><i class="ph-duotone ph-caret-down" style="font-size:12px;opacity:0.6"></i></button>
           <sc-if value="{{ cmpOpen }}" hint-placeholder-val="{{ false }}">

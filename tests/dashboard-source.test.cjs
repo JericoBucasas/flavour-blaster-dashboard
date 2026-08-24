@@ -68,6 +68,13 @@ test('total sales breakdown is collapsed by default and remains accessible', () 
   assert.match(source, /salesBreakdownToggle:\(\)=>this\.setState\(\{salesBreakdownOpen:!st\.salesBreakdownOpen\}\)/);
 });
 
+test('selected date range stays readable on one line in the desktop control bar', () => {
+  const source = fs.readFileSync('Sales Dashboard v2.dc.html', 'utf8');
+  assert.match(source, /\.sd-date-btn \{ flex:none;white-space:nowrap;font-variant-numeric:tabular-nums; \}/);
+  assert.match(source, /class="btn btn-secondary sd-date-btn"/);
+  assert.match(source, /class="sd-date-btn-label">\{\{ dateBtnLabel \}\}<\/span>/);
+});
+
 test('Shopify financials never fall back to order snapshot formulas', () => {
   const source = fs.readFileSync('supabase/migrations/202608240004_shopify_event_authority.sql', 'utf8');
   assert.match(source, /create or replace function public\.fb_dashboard_snapshot_v5/);
