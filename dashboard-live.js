@@ -127,6 +127,27 @@
       if (part && part.coverageStart) coverageStarts.push(part.coverageStart);
       if (part && part.coverageEnd) coverageEnds.push(part.coverageEnd);
     });
+    var uniqueKeys = {
+      daily:function (row) { return [row.day, row.channel, row.region_code].join('|'); },
+      hourly:function (row) { return [row.day, row.hour, row.channel, row.region_code].join('|'); },
+    };
+    Object.keys(uniqueKeys).forEach(function (key) {
+      if (!Array.isArray(merged[key])) return;
+      var byKey = new Map();
+      merged[key].forEach(function (row) { byKey.set(uniqueKeys[key](row), row); });
+      merged[key] = Array.from(byKey.values());
+    });
+    if (Array.isArray(merged.products)) {
+      var productMap = new Map();
+      var summedProductFields = ['cogs', 'units', 'refunds', 'net_sales', 'gross_sales', 'gross_profit', 'refunded_units'];
+      merged.products.forEach(function (row) {
+        var key = String(row.shopify_variant_id || row.sku || row.title);
+        if (!productMap.has(key)) { productMap.set(key, Object.assign({}, row)); return; }
+        var product = productMap.get(key);
+        summedProductFields.forEach(function (field) { product[field] = number(product[field]) + number(row[field]); });
+      });
+      merged.products = Array.from(productMap.values());
+    }
     if (Array.isArray(merged.recentOrders)) {
       var seen = new Set();
       merged.recentOrders = merged.recentOrders.filter(function (order) {
@@ -168,5 +189,5 @@
     return mergePayloads(parts, start, end);
   }
 
-  root.FlavourBlasterLive = { load:load, loadRange:loadRange, normalize:normalize };
+  root.FlavourBlasterLive = { load:load, loadRange:loadRange, mergePayloads:mergePayloads, normalize:normalize };
 })(window);

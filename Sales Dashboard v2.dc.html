@@ -1476,9 +1476,18 @@ class Component extends DCLogic {
     if (this.state.dataRequestKey === requestKey && this.state.dataStatus !== 'error' && this.state.dataStatus !== 'empty') return;
     this.setState({ dataStatus:'loading', dataError:null, dataRequestKey:requestKey });
     try {
+      const today = new Date(this.NOW).toISOString().slice(0, 10);
+      const nowDate = new Date(this.NOW);
+      const monthStart = new Date(Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth(), 1)).toISOString().slice(0, 10);
+      let monthPayload = null;
+      if (bounds.start > monthStart || bounds.end < today) {
+        monthPayload = await window.FlavourBlasterLive.loadRange('/api/dashboard', monthStart, today, 'overview');
+        monthPayload = { ...monthPayload, products:[], recentOrders:[], hourly:[] };
+      }
       let payload = { ...(this.state.livePayload || {}) };
       for (const section of sections) {
-        const loadedPayload = await window.FlavourBlasterLive.loadRange('/api/dashboard', bounds.start, bounds.end, section);
+        let loadedPayload = await window.FlavourBlasterLive.loadRange('/api/dashboard', bounds.start, bounds.end, section);
+        if (monthPayload) loadedPayload = window.FlavourBlasterLive.mergePayloads([loadedPayload, monthPayload], bounds.start < monthStart ? bounds.start : monthStart, bounds.end > today ? bounds.end : today);
         payload = { ...payload, ...loadedPayload };
       }
       const normalized = window.FlavourBlasterLive.normalize(payload, this.CH, this.RG);
