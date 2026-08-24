@@ -36,6 +36,9 @@ test('orders query uses Shopify shop currency and does not request customer emai
   const query = workflow.nodes.find((node) => node.name === 'Shopify GraphQL - Orders Page').parameters.body;
   const normalize = workflow.nodes.find((node) => node.name === 'Normalize Orders, Lines and Customers').parameters.jsCode;
   assert.doesNotMatch(query, /displayName email/);
+  assert.match(query, /customer \{ id legacyResourceId displayName/);
+  assert.match(normalize, /customer_id:customerId/);
+  assert.match(normalize, /customer_display_name:o\.customer\?\.displayName \|\| null/);
   assert.match(normalize, /currentTotalPriceSet\?\.shopMoney\?\.currencyCode/);
   assert.match(normalize, /email: null/);
 });
