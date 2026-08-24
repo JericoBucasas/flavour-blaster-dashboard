@@ -11,4 +11,6 @@ test('dashboard has one update lifecycle and loads continuous sections separatel
   assert.doesNotMatch(source, /componentDidUpdate\([^)]*,/);
   assert.match(source, /\['overview','products','customers'\]/);
   assert.doesNotMatch(source, /\? 'all' : this\.state\.view/);
+  assert.match(source, /alignToLatest/);
+  assert.match(source, /rangeKey:coverageEndMs === this\.NOW - this\.D \? 'yesterday' : 'custom'/);
 });

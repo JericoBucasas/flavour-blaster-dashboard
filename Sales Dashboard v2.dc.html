@@ -1474,8 +1474,14 @@ class Component extends DCLogic {
       }
       this.days = normalized.days;
       const baseCurrency = payload.reportingCurrencyCode || 'USD';
+      const coverageEnd = payload.coverageEnd || null;
+      const coverageEndMs = coverageEnd ? Date.parse(coverageEnd + 'T00:00:00Z') : NaN;
+      const alignToLatest = !this._alignedToCoverage && this.state.rangeKey === 'today' &&
+        isFinite(coverageEndMs) && coverageEndMs < this.NOW;
+      if (isFinite(coverageEndMs)) this._alignedToCoverage = true;
       this.setState({ dataStatus:'live', livePayload:payload, dataUpdatedAt:payload.sync?.last_success_at || payload.sourceLastUpdatedAt || payload.generatedAt || null,
-        dataCoverageStart:payload.coverageStart || null, dataCoverageEnd:payload.coverageEnd || null, dataBaseCurrency:baseCurrency,
+        dataCoverageStart:payload.coverageStart || null, dataCoverageEnd:coverageEnd, dataBaseCurrency:baseCurrency,
+        ...(alignToLatest ? { rangeKey:coverageEndMs === this.NOW - this.D ? 'yesterday' : 'custom', start:coverageEndMs, end:coverageEndMs } : {}),
         chOn:{ ...this.state.chOn, d2c:true, b2b:true, amzus:true, amzuk:true } });
     } catch (error) {
       this.setState({ dataStatus:'error', dataError:error && error.message ? error.message : 'LIVE_DATA_UNAVAILABLE' });
