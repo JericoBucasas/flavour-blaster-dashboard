@@ -1413,7 +1413,7 @@ class Component extends DCLogic {
       theme:(hp.t && this.THEMES.some(t => t[0] === hp.t)) ? hp.t : (hp.d === '1' ? 'ink' : (ls.theme && this.THEMES.some(t => t[0] === ls.theme) ? ls.theme : 'paper')),
       accent:'custom',
       accentHex:(hp.ah && /^[0-9a-fA-F]{6}$/.test(hp.ah)) ? '#' + hp.ah : (ls.brandV === 2 && ls.accentHex ? ls.accentHex : '#c9377e'),
-      hsv:null, accHexDraft:null, accPickOpen:false, searchQ:'', searchExp:false, selKpi:'gross', chartOn:{}, ordSort:null, prodSort:null, productStatus:'active', expandedProduct:null, prodColumnsOpen:false,
+      hsv:null, accHexDraft:null, accPickOpen:false, searchQ:'', searchExp:false, selKpi:'total', chartOn:{}, ordSort:null, prodSort:null, productStatus:'active', expandedProduct:null, prodColumnsOpen:false,
       prodColOn:{ name:true, sku:false, status:true, vendor:false, tags:false, price:true, cost:false, gm:false, units:true, sales:false, stock:true, locations:false, updatedAt:false },
       directoryTab:'customers', directoryColumnsOpen:false, dirSort:null, expandedDirectory:null,
       dirColOn:{
@@ -1912,6 +1912,7 @@ class Component extends DCLogic {
     const pRet = st.dataStatus === 'live' ? cRet : (prev.u ? prev.rfU / prev.u : 0);
     const A2 = 'var(--color-accent-2-500)';
     const kpisAll = [
+      { k:'total', label:'Total sales', val:this.money(cur.ts), ...this.delta(cur.ts, prev.ts), ...this.sparks(cur, prev, d => d.ts) },
       { k:'gross', label:'Gross sales', val:this.money(cur.s), ...this.delta(cur.s, prev.s), ...this.sparks(cur, prev, d => d.s) },
       { k:'net', label:'Net sales', val:this.money(cur.ns), ...this.delta(cur.ns, prev.ns), ...this.sparks(cur, prev, d => d.ns) },
       { k:'orders', label:'Orders', val:this.num(cur.o), ...this.delta(cur.o, prev.o), ...this.sparks(cur, prev, d => d.o) },
@@ -1926,7 +1927,7 @@ class Component extends DCLogic {
     const kpiOrd = (st.kpiOrder && st.kpiOrder.length === kpisAll.length) ? st.kpiOrder : kpisAll.map(x => x.k);
     this._kpiOrd = kpiOrd;
     const kpis = kpiOrd.map(k2 => kpisAll.find(x => x.k === k2)).filter(x => x && (st.kpiOn[x.k] ?? true))
-      .map(x => ({ ...x, pick:() => this.setState({ selKpi:x.k, hi:null }), selSh:(st.selKpi || 'gross') === x.k ? 'inset 0 0 0 2px var(--color-accent-500)' : 'none' }));
+      .map(x => ({ ...x, pick:() => this.setState({ selKpi:x.k, hi:null }), selSh:(st.selKpi || 'total') === x.k ? 'inset 0 0 0 2px var(--color-accent-500)' : 'none' }));
     const salesBreakdown = [
       { label:'Gross sales', value:this.money2(cur.s), wt:'500', col:'inherit', bg:'transparent' },
       { label:'Discounts', value:this.signedMoney2(-cur.dsc), wt:'500', col:'inherit', bg:'var(--color-neutral-100)' },
@@ -1965,9 +1966,10 @@ class Component extends DCLogic {
     const xT = cur.ds.length === 1 ? 'Hour of day' : 'Date';
     // overview chart follows the selected KPI card
     const pf = v => (v * 100).toFixed(1) + '%', pf2 = v => (v * 100).toFixed(2) + '%';
-    const selKpi = st.selKpi || 'gross';
+    const selKpi = st.selKpi || 'total';
     const MET = {
-      gross:['Total sales over time', d => d.s, km, m2, true],
+      total:['Total sales over time', d => d.ts, km, m2, true],
+      gross:['Gross sales over time', d => d.s, km, m2, true],
       net:['Net sales over time', d => d.ns, km, m2, true],
       orders:['Orders over time', d => d.o, kn, n2, true],
       aov:['Average order value over time', d => d.aovO ? d.aovS / d.aovO : 0, v => this.money(v), v => this.money2Aov(v), false],

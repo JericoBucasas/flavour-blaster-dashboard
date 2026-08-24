@@ -51,6 +51,14 @@ test('dashboard uses Shopify-compatible two-decimal presentation for AOV', () =>
   assert.match(source, /Average order value', val:this\.money2Aov\(cAov\)/);
 });
 
+test('total sales is the first KPI and drives the default overview chart', () => {
+  const source = fs.readFileSync('Sales Dashboard v2.dc.html', 'utf8');
+  assert.match(source, /const kpisAll = \[\s*\{ k:'total', label:'Total sales', val:this\.money\(cur\.ts\)/);
+  assert.match(source, /selKpi:'total'/);
+  assert.match(source, /total:\['Total sales over time', d => d\.ts/);
+  assert.match(source, /gross:\['Gross sales over time', d => d\.s/);
+});
+
 test('Shopify financials never fall back to order snapshot formulas', () => {
   const source = fs.readFileSync('supabase/migrations/202608240004_shopify_event_authority.sql', 'utf8');
   assert.match(source, /create or replace function public\.fb_dashboard_snapshot_v5/);
