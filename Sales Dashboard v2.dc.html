@@ -1481,7 +1481,7 @@ class Component extends DCLogic {
       this.setState({ dataStatus:'error', dataError:error && error.message ? error.message : 'LIVE_DATA_UNAVAILABLE' });
     }
   }
-  componentDidUpdate(_prevProps, prevState) {
+  componentDidUpdate(prevState) {
     const st = this.state;
     const viewChanged = prevState.view !== st.view || prevState.continuous !== st.continuous;
     const liveRequestFinished = prevState.dataStatus === 'loading' && st.dataStatus === 'live';
