@@ -1454,20 +1454,32 @@ class Component extends DCLogic {
     this.loadLiveData();
   }
   componentWillUnmount() { window.removeEventListener('keydown', this._keys); }
+  liveBounds(st = this.state) {
+    let start = st.start, end = st.end;
+    const span = st.end - st.start + this.D;
+    let pS = st.start - span, pE = st.start - this.D;
+    if (st.cmpMode === 'py') { const sd = new Date(st.start), ed = new Date(st.end); pS = Date.UTC(sd.getUTCFullYear() - 1, sd.getUTCMonth(), sd.getUTCDate()); pE = Date.UTC(ed.getUTCFullYear() - 1, ed.getUTCMonth(), ed.getUTCDate()); }
+    else if (st.cmpMode === 'pydow') { pS = st.start - 364 * this.D; pE = st.end - 364 * this.D; }
+    else if (st.cmpMode === 'custom' && st.cmpS != null) { pS = st.cmpS; pE = st.cmpE ?? st.cmpS; }
+    if (st.cmpMode !== 'none') { start = Math.min(start, pS); end = Math.max(end, pE); }
+    return { start:new Date(start).toISOString().slice(0, 10), end:new Date(end).toISOString().slice(0, 10) };
+  }
   async loadLiveData() {
     if (!window.FlavourBlasterLive) {
       this.days = [];
       this.setState({ dataStatus:'error', dataError:'LIVE_LOADER_MISSING' });
       return;
     }
+    const bounds = this.liveBounds();
+    const sections = this.state.continuous ? ['overview','products','customers'] : [this.state.view];
+    const requestKey = bounds.start + '|' + bounds.end + '|' + sections.join(',');
+    if (this._liveRequestKey === requestKey) return;
+    this._liveRequestKey = requestKey;
     this.setState({ dataStatus:'loading', dataError:null });
     try {
-      const start = '2019-01-01';
-      const end = new Date(this.NOW).toISOString().slice(0, 10);
-      const sections = this.state.continuous ? ['overview','products','customers'] : [this.state.view];
       let payload = { ...(this.state.livePayload || {}) };
       for (const section of sections) {
-        const loadedPayload = await window.FlavourBlasterLive.load('/api/dashboard', start, end, section);
+        const loadedPayload = await window.FlavourBlasterLive.loadRange('/api/dashboard', bounds.start, bounds.end, section);
         payload = { ...payload, ...loadedPayload };
       }
       const normalized = window.FlavourBlasterLive.normalize(payload, this.CH, this.RG);
@@ -1489,18 +1501,24 @@ class Component extends DCLogic {
         dataCoverageStart:payload.coverageStart || null, dataCoverageEnd:coverageEnd, dataBaseCurrency:baseCurrency, shopifyReconciliation,
         ...(alignToLatest ? { rangeKey:coverageEndMs === this.NOW - this.D ? 'yesterday' : 'custom', start:coverageEndMs, end:coverageEndMs } : {}) });
     } catch (error) {
+      this._liveRequestKey = null;
       this.days = [];
       this.setState({ dataStatus:'error', dataError:error && error.message ? error.message : 'LIVE_DATA_UNAVAILABLE' });
     }
   }
   componentDidUpdate(prevState) {
     const st = this.state;
+    const rangeChanged = prevState.start !== st.start || prevState.end !== st.end || prevState.cmpMode !== st.cmpMode || prevState.cmpS !== st.cmpS || prevState.cmpE !== st.cmpE;
+    if (rangeChanged) {
+      clearTimeout(this._liveRangeTimer);
+      this._liveRangeTimer = setTimeout(() => { this._liveRequestKey = null; this.loadLiveData(); }, 120);
+    }
     const viewChanged = prevState.view !== st.view || prevState.continuous !== st.continuous;
     const liveRequestFinished = prevState.dataStatus === 'loading' && st.dataStatus === 'live';
     const needsProducts = st.view === 'products' && !st.livePayload?.productCatalog;
     const needsCustomers = st.view === 'customers' && !st.livePayload?.customerDirectory;
     const needsAll = st.continuous && (!st.livePayload?.productCatalog || !st.livePayload?.customerDirectory);
-    if (st.dataStatus !== 'loading' && (viewChanged || liveRequestFinished) && (needsProducts || needsCustomers || needsAll)) {
+    if (!rangeChanged && st.dataStatus !== 'loading' && (viewChanged || liveRequestFinished) && (needsProducts || needsCustomers || needsAll)) {
       this.loadLiveData();
       return;
     }

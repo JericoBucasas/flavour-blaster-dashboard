@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const test = require('node:test');
 
-test('dashboard has one update lifecycle and loads continuous sections separately', () => {
+test('dashboard loads only the selected and comparison ranges without reload loops', () => {
   const source = fs.readFileSync('Sales Dashboard v2.dc.html', 'utf8');
   assert.equal((source.match(/\bcomponentDidUpdate\s*\(/g) || []).length, 1);
   assert.match(source, /componentDidUpdate\(prevState\)/);
@@ -13,8 +13,11 @@ test('dashboard has one update lifecycle and loads continuous sections separatel
   assert.doesNotMatch(source, /\? 'all' : this\.state\.view/);
   assert.match(source, /alignToLatest/);
   assert.match(source, /rangeKey:coverageEndMs === this\.NOW - this\.D \? 'yesterday' : 'custom'/);
-  assert.match(source, /const start = '2019-01-01'/);
-  assert.doesNotMatch(source, /const rangeChanged = prevState\.start !== st\.start/);
+  assert.match(source, /liveBounds\(st = this\.state\)/);
+  assert.match(source, /const rangeChanged = prevState\.start !== st\.start/);
+  assert.match(source, /this\._liveRequestKey === requestKey/);
+  assert.match(source, /FlavourBlasterLive\.loadRange/);
+  assert.doesNotMatch(source, /const start = '2019-01-01'/);
   assert.match(source, /Shopify-authoritative financials/);
   assert.match(source, /c\.k === 'd2c' \|\| c\.k === 'b2b'/);
   assert.doesNotMatch(source, /d2c:true, b2b:true, amzus:true, amzuk:true/);

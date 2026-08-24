@@ -104,5 +104,69 @@
     return body.data;
   }
 
-  root.FlavourBlasterLive = { load:load, normalize:normalize };
+  function addDays(isoDate, days) {
+    var timestamp = dateMs(isoDate) + days * 86400000;
+    return new Date(timestamp).toISOString().slice(0, 10);
+  }
+
+  function mergePayloads(parts, start, end) {
+    var merged = {};
+    var arrayKeys = ['daily', 'hourly', 'products', 'recentOrders'];
+    var reconciliations = [];
+    var coverageStarts = [];
+    var coverageEnds = [];
+    parts.forEach(function (part) {
+      Object.keys(part || {}).forEach(function (key) {
+        if (arrayKeys.indexOf(key) >= 0 || key === 'shopifyReconciliation') return;
+        merged[key] = part[key];
+      });
+      arrayKeys.forEach(function (key) {
+        if (Array.isArray(part && part[key])) merged[key] = (merged[key] || []).concat(part[key]);
+      });
+      if (part && part.shopifyReconciliation) reconciliations.push(part.shopifyReconciliation);
+      if (part && part.coverageStart) coverageStarts.push(part.coverageStart);
+      if (part && part.coverageEnd) coverageEnds.push(part.coverageEnd);
+    });
+    if (Array.isArray(merged.recentOrders)) {
+      var seen = new Set();
+      merged.recentOrders = merged.recentOrders.filter(function (order) {
+        var key = [order.order_name, order.processed_at, order.total_sales].join('|');
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }).sort(function (a, b) { return String(b.processed_at || '').localeCompare(String(a.processed_at || '')); }).slice(0, 100);
+    }
+    if (reconciliations.length) {
+      var issue = reconciliations.find(function (item) { return item.status !== 'reconciled' && item.status !== 'current_day_as_of_sync'; });
+      var latest = reconciliations[reconciliations.length - 1];
+      merged.shopifyReconciliation = Object.assign({}, latest, {
+        requestedStart:start,
+        requestedEnd:end,
+        status:issue ? issue.status : latest.status,
+        missingInitialOrders:reconciliations.reduce(function (sum, item) { return sum + number(item.missingInitialOrders); }, 0),
+      });
+    }
+    if (coverageStarts.length) merged.coverageStart = coverageStarts.sort()[0];
+    if (coverageEnds.length) merged.coverageEnd = coverageEnds.sort().slice(-1)[0];
+    return merged;
+  }
+
+  async function loadRange(endpoint, start, end, section) {
+    var chunks = [];
+    var cursor = start;
+    while (cursor <= end) {
+      var chunkEnd = addDays(cursor, 365);
+      if (chunkEnd > end) chunkEnd = end;
+      chunks.push([cursor, chunkEnd]);
+      cursor = addDays(chunkEnd, 1);
+    }
+    var parts = [];
+    for (var index = 0; index < chunks.length; index += 1) {
+      var chunkSection = index === 0 ? section : 'overview';
+      parts.push(await load(endpoint, chunks[index][0], chunks[index][1], chunkSection));
+    }
+    return mergePayloads(parts, start, end);
+  }
+
+  root.FlavourBlasterLive = { load:load, loadRange:loadRange, normalize:normalize };
 })(window);
