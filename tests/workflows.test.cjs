@@ -52,8 +52,11 @@ test('Shopify sales events are incremental, idempotent, and contain no customer 
   const upsert = workflow.nodes.find((node) => node.name === 'Supabase Upsert Sales Events [CREDENTIAL REQUIRED]');
   const checkpoint = workflow.nodes.find((node) => node.name === 'Sales Events | Upsert Success Checkpoint [CREDENTIAL REQUIRED]');
   assert.match(read.parameters.url, /shopify_sales_events/);
-  assert.match(build.parameters.jsCode, /7 \* 86400000/);
-  assert.match(build.parameters.jsCode, /10 \* 60000/);
+  assert.match(build.parameters.jsCode, /saved\.getTime\(\) - 7 \* 86400000/);
+  assert.doesNotMatch(build.parameters.jsCode, /saved\.getTime\(\) - 10 \* 60000/);
+  assert.match(build.parameters.jsCode, /rolling_7_day_sales_events_sync/);
+  assert.equal(workflow.meta.incrementalOverlapMinutes, 7 * 24 * 60);
+  assert.equal(workflow.meta.salesEventsRollingDays, 7);
   assert.match(shopify.parameters.body, /agreements\(first: 50\)/);
   assert.match(shopify.parameters.body, /sales\(first: 50\)/);
   assert.doesNotMatch(shopify.parameters.body, /customer|email|phone|billingAddress|shippingAddress/);

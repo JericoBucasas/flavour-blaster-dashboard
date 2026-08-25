@@ -1060,7 +1060,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const rows = $input.all().map(i => i.json);\nconst checkpoint = rows.find(r => r && r.source_key === 'shopify_sales_events') || null;\nconst end = new Date();\nconst floor = new Date(Math.max(Date.parse('2025-01-01T00:00:00.000Z'), end.getTime() - 7 * 86400000));\nconst saved = checkpoint?.cursor_updated_at ? new Date(checkpoint.cursor_updated_at) : null;\nconst overlap = saved && !Number.isNaN(saved.getTime()) ? new Date(saved.getTime() - 10 * 60000) : floor;\nconst start = overlap > floor ? overlap : floor;\nreturn [{ json: { start:start.toISOString(), end:end.toISOString(), after:null, page:1, maxPages:50 } }];"
+        "jsCode": "const rows = $input.all().map(i => i.json);\nconst checkpoint = rows.find(r => r && r.source_key === 'shopify_sales_events') || null;\nconst end = new Date();\nconst floor = new Date(Math.max(Date.parse('2025-01-01T00:00:00.000Z'), end.getTime() - 7 * 86400000));\nconst saved = checkpoint?.cursor_updated_at ? new Date(checkpoint.cursor_updated_at) : null;\nconst overlap = saved && !Number.isNaN(saved.getTime()) ? new Date(saved.getTime() - 7 * 86400000) : floor;\nconst start = overlap > floor ? overlap : floor;\nreturn [{ json: { start:start.toISOString(), end:end.toISOString(), eventStart:start.toISOString(), eventEnd:end.toISOString(), after:null, page:1, maxPages:50, mode:'rolling_7_day_sales_events_sync' } }];"
       },
       "id": "sales-events-build-window",
       "name": "Sales Events | Build Incremental Window",
@@ -1670,7 +1670,8 @@
     "targetFolderId": "BafBm52YFWfYw7sU",
     "scheduleTimezone": "Europe/London",
     "historicalFloor": "2025-01-01T00:00:00.000Z",
-    "incrementalOverlapMinutes": 10,
+    "incrementalOverlapMinutes": 10080,
+    "salesEventsRollingDays": 7,
     "sources": [
       "jetchill-mixology",
       "flavour-blaster-amazon-us",
