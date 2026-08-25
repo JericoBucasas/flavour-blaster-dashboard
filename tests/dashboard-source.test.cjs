@@ -149,3 +149,14 @@ test('Shopify B2B classification refreshes historical orders after directory cha
   assert.match(source, /revoke all on function public\.fb_reclassify_shopify_customer_orders/);
   assert.match(source, /grant execute on function public\.fb_reclassify_shopify_company_orders/);
 });
+
+test('customer reclassification trigger guards table-specific record fields', () => {
+  const source = fs.readFileSync('supabase/migrations/20260825092439_fix_customer_reclassification_trigger.sql', 'utf8');
+  assert.match(source, /if tg_table_name = 'fb_customers' then/);
+  assert.match(source, /elsif tg_table_name = 'fb_company_contacts' then/);
+  assert.match(source, /old\.tags is not distinct from new\.tags/);
+  assert.match(source, /old\.shopify_company_id is not distinct from new\.shopify_company_id/);
+  assert.match(source, /raise exception 'Unsupported trigger table/);
+  assert.match(source, /revoke all on function public\.fb_reclassify_shopify_customer_orders/);
+  assert.match(source, /grant execute on function public\.fb_reclassify_shopify_customer_orders/);
+});
