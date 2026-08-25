@@ -81,7 +81,7 @@ test('dashboard keeps the public address at the canonical root URL', () => {
   assert.equal(fs.existsSync('index.html'), false);
   assert.deepEqual(routing.rewrites, [{
     source: '/',
-    destination: '/Sales%20Dashboard%20v2.dc.html',
+    destination: '/Sales%20Dashboard%20v2.dc',
   }]);
   assert.match(source, /history\.replaceState\(null, '', '\/'\)/);
   assert.doesNotMatch(source, /const h = '#' \+ parts\.join/);

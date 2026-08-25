@@ -4,7 +4,7 @@
   "rewrites": [
     {
       "source": "/",
-      "destination": "/Sales%20Dashboard%20v2.dc.html"
+      "destination": "/Sales%20Dashboard%20v2.dc"
     }
   ]
 }
