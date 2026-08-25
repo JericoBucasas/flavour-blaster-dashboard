@@ -1551,13 +1551,11 @@ class Component extends DCLogic {
     if (this._savedJson == null) this._savedJson = json;
     const dirty = json !== this._savedJson;
     if (dirty !== !!st.settingsDirty) this.setState({ settingsDirty:dirty });
-    const parts = ['v=' + st.view, st.rangeKey === 'custom' ? 's=' + st.start + '&e=' + st.end : 'r=' + st.rangeKey, 'cm=' + st.cmpMode + (st.cmpMode === 'custom' && st.cmpS != null ? '&cs=' + st.cmpS + '&ce=' + (st.cmpE ?? st.cmpS) : '')];
-    if (st.continuous) parts.push('l=c');
-    if (st.theme !== 'paper') parts.push('t=' + st.theme);
-    if (st.accent !== 'cyan') parts.push('a=' + st.accent);
-    if (st.accent === 'custom') parts.push('ah=' + (st.accentHex || '#c9377e').slice(1));
-    const h = '#' + parts.join('&');
-    if (window.location.hash !== h) { try { history.replaceState(null, '', window.location.pathname + window.location.search + h); } catch (e) {} }
+    // Keep the public dashboard address clean. Legacy hash links are still read
+    // during construction, then normalized to the canonical root URL.
+    if (window.location.pathname !== '/' || window.location.search || window.location.hash) {
+      try { history.replaceState(null, '', '/'); } catch (e) {}
+    }
   }
   settingsJson() {
     const st = this.state;
@@ -1578,11 +1576,7 @@ class Component extends DCLogic {
     this.setState({ settingsDirty:false });
   }
   discardSettings() {
-    // strip appearance keys from the hash so saved values win on reload
-    try {
-      const keep = (window.location.hash || '').slice(1).split('&').filter(kv => kv && !/^(t|a|ah)=/.test(kv));
-      history.replaceState(null, '', window.location.pathname + window.location.search + (keep.length ? '#' + keep.join('&') : ''));
-    } catch (e) {}
+    try { history.replaceState(null, '', '/'); } catch (e) {}
     window.location.reload();
   }
   hexToHsv(hex) { const n = parseInt(hex.slice(1), 16); const r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; let h = 0; if (d) { if (mx === r) h = ((g - b) / d) % 6; else if (mx === g) h = (b - r) / d + 2; else h = (r - g) / d + 4; h = Math.round(h * 60); if (h < 0) h += 360; } return { h, s:mx ? d / mx : 0, v:mx }; }

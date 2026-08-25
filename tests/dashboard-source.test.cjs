@@ -75,6 +75,18 @@ test('selected date range stays readable on one line in the desktop control bar'
   assert.match(source, /class="sd-date-btn-label">\{\{ dateBtnLabel \}\}<\/span>/);
 });
 
+test('dashboard keeps the public address at the canonical root URL', () => {
+  const source = fs.readFileSync('Sales Dashboard v2.dc.html', 'utf8');
+  const routing = JSON.parse(fs.readFileSync('vercel.json', 'utf8'));
+  assert.equal(fs.existsSync('index.html'), false);
+  assert.deepEqual(routing.rewrites, [{
+    source: '/',
+    destination: '/Sales%20Dashboard%20v2.dc.html',
+  }]);
+  assert.match(source, /history\.replaceState\(null, '', '\/'\)/);
+  assert.doesNotMatch(source, /const h = '#' \+ parts\.join/);
+});
+
 test('orders view applies active channel and region filters to rows and hourly data', () => {
   const source = fs.readFileSync('Sales Dashboard v2.dc.html', 'utf8');
   assert.match(source, /st\.livePayload\.recentOrders\.filter\(order =>/);
