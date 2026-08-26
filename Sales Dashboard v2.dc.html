@@ -81,6 +81,13 @@
     .dir-detail-lines { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 24px;margin-top:8px; }
     .dir-detail-line { padding:7px 0;border-top:1px solid var(--sd-line);font-size:12.5px;line-height:1.45;overflow-wrap:anywhere; }
     .dir-mobile-list { display:none; }
+    .prod-mobile-list { display:none; }
+    .mobile-list-more { display:none; }
+    .mobile-metrics-toggle { display:none; }
+    .dashboard-state { margin-top:16px; }
+    .dashboard-skeleton-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px; }
+    .dashboard-skeleton-block { min-height:86px;border-radius:12px;background:var(--color-neutral-200);position:relative;overflow:hidden; }
+    #lg-main.data-loading section[data-screen-label], #lg-main.data-error section[data-screen-label], #lg-main.data-empty section[data-screen-label] { display:none !important; }
     #lg-bbar, #lg-fab { display: none; }
     @media (max-width: 920px) {
       .m-hide { display: none !important; }
@@ -91,11 +98,11 @@
       #lg-nav { display: none !important; }
       /* flags live in the bell dropdown; hide the sidebar list */
       #lg-flags, #lg-flags-h { display: none !important; }
-      /* floating bottom tab bar, Shopify-app style */
-      #lg-bbar { display: flex !important; position: fixed; left: 12px; right: 76px; bottom: 12px; z-index: 38; background: var(--sd-card); border: 1px solid var(--sd-line); border-radius: 999px; box-shadow: var(--shadow-lg); padding: 5px 10px calc(5px + env(safe-area-inset-bottom, 0px)); gap: 2px; }
-      #lg-fab { display: flex !important; flex-direction: column; position: fixed; right: 12px; bottom: 12px; z-index: 38; align-items: center; justify-content: center; gap: 3px; background: var(--sd-card); border: 1px solid var(--sd-line); border-radius: 999px; box-shadow: var(--shadow-lg); cursor: pointer; padding: 12px 15px calc(11px + env(safe-area-inset-bottom, 0px)); }
-      #lg-fab:active { transform: scale(0.94); }
-      #lg-main { padding-bottom: 104px !important; }
+      /* four clear destinations; filters move into the page header */
+      #lg-bbar { display: flex !important; position: fixed; left: 12px; right: 12px; bottom: max(10px, env(safe-area-inset-bottom, 0px)); z-index: 38; background: var(--sd-card); border: 1px solid var(--sd-line); border-radius: 16px; box-shadow: var(--shadow-lg); padding: 5px 8px; gap: 2px; }
+      #lg-bbar button { appearance:none;min-width:0;min-height:52px;border:0;background:transparent;color:inherit;font:inherit; }
+      #lg-bbar button:focus-visible, #lg-mobile-filter:focus-visible, #lg-kpistrip button:focus-visible, .mobile-metrics-toggle:focus-visible { outline:2px solid var(--color-accent-500);outline-offset:2px; }
+      #lg-fab { display:none !important; }
       /* legacy pills rules (unused when hidden) */
       #lg-flags { flex-direction: row !important; flex-wrap: nowrap !important; overflow-x: auto; gap: 8px !important; padding-bottom: 4px !important; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
       #lg-flags::-webkit-scrollbar { display: none; }
@@ -103,27 +110,39 @@
       #lg-flags > div span { overflow: hidden; text-overflow: ellipsis; }
       #lg-flags-h { margin: 10px 0 8px !important; }
       #lg-brandmid { justify-content: center; text-align: center; }
-      /* Shopify-app order: the sales chart sits above the Overview title bar */
+      /* Keep mobile context title-first; sections follow the sticky title bar in DOM order. */
       #lg-main { display: flex; flex-direction: column; }
-      #sec-overview { display: contents; }
-      #lg-main > *, #sec-overview > * { order: 3; }
-      /* chart bleeds full-width and blends with the header strip above it */
-      #lg-ovchart { order: 1; margin: 0 -16px 0 !important; border: none !important; border-radius: 0 !important; box-shadow: none !important; padding: 6px 16px 16px !important; border-bottom: 1px solid var(--sd-line) !important; }
-      #lg-ctrl { order: 2; }
+      #lg-ctrl { order:0; }
+      #lg-main > section, #lg-main > sc-if { order:1; }
+      #sec-overview { display:block; }
+      #lg-ovchart { margin-top:12px !important; }
       #lg-ovlegend { display: none !important; }
-      /* Shopify-app KPI strip above the chart */
-      #lg-ovtitle { display: none !important; }
-      #lg-kpistrip { display: flex !important; gap: 8px; overflow-x: auto; padding: 2px 2px 10px; margin: 4px -2px 0; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
-      #lg-kpistrip::-webkit-scrollbar { display: none; }
-      #lg-main { padding: 0 16px 116px !important; }
+      #lg-ovtitle { display:block !important; }
+      #lg-kpistrip { display:grid !important;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px; }
+      #lg-kpistrip button { appearance:none;min-width:0;min-height:104px;border:1px solid var(--sd-line);border-radius:12px;background:var(--sd-card);color:inherit;font:inherit;text-align:left;padding:12px;cursor:pointer;box-shadow:var(--sd-sh); }
+      #lg-main { padding: 0 16px calc(96px + env(safe-area-inset-bottom, 0px)) !important; }
       /* control bar stays sticky and compact; controls swipe horizontally on one line */
-      #lg-ctrl { top: 0 !important; margin: 0 -16px 14px !important; padding: 8px 16px 10px !important; gap: 6px 12px !important; }
+      #lg-ctrl { top: 0 !important; margin: 0 -16px 2px !important; padding: 9px 16px 10px !important; gap: 6px 12px !important; }
+      #lg-ctrl > div:first-child { display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%; }
+      #lg-mobile-filter { display:inline-flex !important;min-width:44px;min-height:44px;align-items:center;justify-content:center;gap:6px;flex:none; }
       #lg-ctrl h1 { font-size: 17px !important; white-space: nowrap !important; }
-      #lg-ctrl > div:first-child > div { max-width: 100% !important; }
+      #lg-ctrl > div:first-child > div { max-width: calc(100% - 54px) !important; }
       #lg-ctrl > div:last-child { flex-wrap: nowrap !important; overflow-x: auto; width: 100%; padding-bottom: 2px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
       #lg-ctrl > div:last-child::-webkit-scrollbar { display: none; }
       .dir-desktop-table { display:none !important; }
       .dir-mobile-list { display:grid;gap:8px; }
+      .prod-desktop-table { display:none !important; }
+      .prod-mobile-list { display:grid;gap:9px; }
+      .mobile-list-more { appearance:none;display:flex !important;align-items:center;justify-content:center;gap:7px;width:100%;min-height:44px;margin-top:10px;border:1px solid var(--sd-line);border-radius:10px;background:var(--sd-card);color:inherit;font:inherit;font-size:12.5px;font-weight:650;cursor:pointer; }
+      .mobile-list-more:focus-visible { outline:2px solid var(--color-accent-500);outline-offset:2px; }
+      .prod-mobile-card { border:1px solid var(--sd-line);border-radius:12px;background:var(--sd-card);padding:13px 14px;box-shadow:var(--sd-sh); }
+      .prod-mobile-head { display:flex;align-items:flex-start;justify-content:space-between;gap:12px; }
+      .prod-mobile-name { min-width:0;font-size:14px;line-height:1.35;font-weight:650;overflow-wrap:anywhere; }
+      .prod-mobile-variant { display:block;margin-top:2px;font-size:11.5px;font-weight:400;opacity:.62; }
+      .prod-mobile-metrics { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 16px;margin-top:12px;padding-top:11px;border-top:1px solid var(--sd-line); }
+      .prod-mobile-metric span { display:block;font-size:11px;line-height:1.25;opacity:.68;margin-bottom:3px; }
+      .prod-mobile-metric strong { display:block;font-size:14px;font-weight:650;font-variant-numeric:tabular-nums;overflow-wrap:anywhere; }
+      .prod-mobile-metric .prod-inventory-expand { justify-content:flex-start;text-align:left;min-height:28px;padding:0; }
       .directory-card { background:transparent !important;border:0 !important;box-shadow:none !important;padding:0 !important; }
       .directory-toolbar { align-items:stretch !important;gap:8px !important; }
       .dir-tabs { flex:1 1 100%;width:100%;box-sizing:border-box;overflow:visible; }
@@ -144,10 +163,19 @@
       .sd-kpis > div > div:nth-child(2) { font-size:17px !important;margin-top:4px !important;overflow-wrap:anywhere; }
       .sd-kpis > div > div:nth-child(3) { height:auto !important;min-height:28px !important;line-height:1.3;margin-top:4px !important; }
       #sec-overview > .sd-kpis { display:none !important; }
+      .sd-kpis > div:nth-child(n+5) { display:var(--mobile-extra-display, none) !important; }
+      .mobile-metrics-toggle { appearance:none;display:flex !important;align-items:center;justify-content:center;gap:7px;width:100%;min-height:44px;margin-top:8px;border:1px solid var(--sd-line);border-radius:10px;background:transparent;color:inherit;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer; }
+      .data-status-banner { padding:8px 10px !important;margin-bottom:2px !important; }
+      .data-status-banner .m-only { min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+      .dashboard-state { margin-top:12px; }
+      .dashboard-state .sd-card { margin-top:0 !important; }
+      .morning-brief p { display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:var(--brief-lines, 2);overflow:hidden; }
+      .morning-brief-toggle { appearance:none;display:inline-flex !important;align-items:center;gap:5px;min-height:44px;margin-top:2px;padding:0;border:0;background:transparent;color:var(--color-accent-700);font:inherit;font-size:12.5px;font-weight:650;cursor:pointer; }
       #sec-products .sd-card-h > div { width:100%; }
       #sec-products .sd-card-h select.input { flex:1 1 0 !important;width:auto !important;min-width:0 !important;max-width:none !important;font-size:12px;padding-left:8px;padding-right:24px; }
       #sec-products .sd-card-h .btn { min-height:40px;padding-left:9px;padding-right:9px;font-size:12px; }
-      #lg-ctrl .btn { flex: none; min-height: 40px; }
+      #lg-ctrl .btn { flex: none; min-height: 44px; }
+      #lg-aside .btn-icon { min-width:44px !important;min-height:44px !important; }
       /* controls live in the bottom Filters widget on mobile — hide the buttons but keep the row
          in the DOM so the fixed-position date/compare pickers can still open from the sheet */
       #lg-ctrl > div:last-child { min-height: 0; padding: 0 !important; gap: 0 !important; }
@@ -228,13 +256,13 @@
       <div onClick="{{ navMenuClose }}" style="position:fixed;inset:0;z-index:40"></div>
       <div class="sd-pop" style="position:fixed;right:12px;bottom:84px;z-index:50;min-width:220px;background:var(--sd-card);box-shadow:var(--shadow-lg);border:1px solid var(--sd-line);border-radius:12px;padding:6px;transform-origin:bottom right">
         <sc-for list="{{ menuNav }}" as="n" hint-placeholder-count="4">
-          <div onClick="{{ n.goMenu }}" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:8px;cursor:pointer;font-size:14px;color:{{ n.col }};background:{{ n.bg }};font-weight:{{ n.wt }}"><i class="ph-duotone {{ n.icon }}" style="font-size:17px;color:{{ n.icol }}"></i>{{ n.label }}</div>
+          <button type="button" onClick="{{ n.goMenu }}" style="appearance:none;display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:10px 12px;border:0;border-radius:8px;cursor:pointer;font:inherit;font-size:14px;text-align:left;color:{{ n.col }};background:{{ n.bg }};font-weight:{{ n.wt }}"><i class="ph-duotone {{ n.icon }}" style="font-size:17px;color:{{ n.icol }}"></i>{{ n.label }}</button>
         </sc-for>
         <div style="border-top:1px solid var(--sd-line);margin:6px 4px"></div>
         <div style="font-size:10.5px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;opacity:0.5;padding:4px 12px 6px">Layout</div>
         <div style="display:flex;gap:2px;background:var(--color-neutral-200);border-radius:var(--radius-md);padding:2px;margin:0 8px 8px">
-          <div onClick="{{ setBySection }}" style="flex:1;text-align:center;padding:8px 4px;font-size:12.5px;cursor:pointer;user-select:none;border-radius:var(--radius-sm);background:{{ segSec.bg }};font-weight:{{ segSec.wt }};box-shadow:{{ segSec.sh }}">By section</div>
-          <div onClick="{{ setContinuous }}" style="flex:1;text-align:center;padding:8px 4px;font-size:12.5px;cursor:pointer;user-select:none;border-radius:var(--radius-sm);background:{{ segCont.bg }};font-weight:{{ segCont.wt }};box-shadow:{{ segCont.sh }}">Continuous</div>
+          <button type="button" onClick="{{ setBySection }}" style="appearance:none;flex:1;border:0;text-align:center;padding:8px 4px;font:inherit;font-size:12.5px;cursor:pointer;user-select:none;border-radius:var(--radius-sm);background:{{ segSec.bg }};font-weight:{{ segSec.wt }};box-shadow:{{ segSec.sh }}">By section</button>
+          <button type="button" onClick="{{ setContinuous }}" style="appearance:none;flex:1;border:0;text-align:center;padding:8px 4px;font:inherit;font-size:12.5px;cursor:pointer;user-select:none;border-radius:var(--radius-sm);background:{{ segCont.bg }};font-weight:{{ segCont.wt }};box-shadow:{{ segCont.sh }}">Continuous</button>
         </div>
       </div>
     </sc-if>
@@ -268,11 +296,10 @@
 
   <div id="lg-bbar">
     <sc-for list="{{ bottomNav }}" as="n" hint-placeholder-count="4">
-      <div onClick="{{ n.goMenu }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 2px 6px;cursor:pointer;border-radius:10px;color:{{ n.col }};font-weight:{{ n.wt }}"><i class="ph-duotone {{ n.icon }}" style="font-size:24px;color:{{ n.icol }}"></i><span style="font-size:11px">{{ n.label }}</span></div>
+      <button type="button" onClick="{{ n.goMenu }}" aria-label="Open {{ n.label }}" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:5px 2px;cursor:pointer;border-radius:10px;color:{{ n.col }};font-weight:{{ n.wt }}"><i class="ph-duotone {{ n.icon }}" style="font-size:22px;color:{{ n.icol }}"></i><span style="font-size:11px">{{ n.label }}</span></button>
     </sc-for>
-    <div onClick="{{ navMenuToggle }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 2px 6px;cursor:pointer;border-radius:10px"><i class="ph-duotone ph-list" style="font-size:24px;color:var(--color-neutral-700)"></i><span style="font-size:11px">Menu</span></div>
+    <button type="button" onClick="{{ navMenuToggle }}" aria-expanded="{{ navMenuOpen }}" aria-label="Open navigation menu" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:5px 2px;cursor:pointer;border-radius:10px"><i class="ph-duotone ph-list" style="font-size:22px;color:var(--color-neutral-700)"></i><span style="font-size:11px">Menu</span></button>
   </div>
-  <div id="lg-fab" onClick="{{ filterSheetToggle }}" role="button" aria-label="Filters" title="Filters" style="color:{{ fsCol }}"><i class="ph-duotone ph-funnel" style="font-size:24px;color:{{ fsIcol }}"></i><span style="font-size:11px">Filter</span></div>
   <sc-if value="{{ filterSheetOpen }}" hint-placeholder-val="{{ false }}">
     <div onClick="{{ filterSheetClose }}" style="position:fixed;inset:0;z-index:44;background:rgba(0,0,0,0.25)"></div>
     <div class="sd-pop" style="position:fixed;left:0;right:0;bottom:0;z-index:50;background:var(--sd-card);border-top:1px solid var(--sd-line);border-radius:20px 20px 0 0;box-shadow:var(--shadow-lg);display:flex;flex-direction:column;max-height:82vh;transform-origin:bottom center">
@@ -316,11 +343,14 @@
       </div>
     </div>
   </sc-if>
-  <main id="lg-main" style="padding:18px clamp(16px,3vw,32px) 64px;min-width:0;box-sizing:border-box;max-width:{{ contentW }}">
+  <main id="lg-main" style="--mobile-extra-display:{{ mobileExtraDisplay }};padding:18px clamp(16px,3vw,32px) 64px;min-width:0;box-sizing:border-box;max-width:{{ contentW }}">
     <div id="lg-ctrl" style="position:sticky;top:0;z-index:{{ ctrlZ }};display:flex;align-items:center;justify-content:space-between;gap:14px 24px;flex-wrap:wrap;margin:-18px calc(-1 * clamp(16px,3vw,32px) - max(0px, 100vw - 232px - {{ contentW }})) 16px calc(-1 * clamp(16px,3vw,32px));padding:10px calc(clamp(16px,3vw,32px) + max(0px, 100vw - 232px - {{ contentW }})) 10px clamp(16px,3vw,32px);background:var(--sd-card);border-bottom:1px solid var(--sd-line);box-shadow:var(--sd-sh)">
       <div style="min-width:0">
-        <h1 style="font-size:20px;font-weight:650;margin:0;line-height:1.2;white-space:nowrap">{{ viewTitle }}</h1>
-        <div style="font-size:12.5px;opacity:0.6;margin-top:2px;white-space:nowrap">{{ rangeLabel }}{{ compareNote }}</div>
+        <div style="min-width:0">
+          <h1 style="font-size:20px;font-weight:650;margin:0;line-height:1.2;white-space:nowrap">{{ viewTitle }}</h1>
+          <div style="font-size:12.5px;opacity:0.6;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ rangeLabel }}{{ compareNote }}</div>
+        </div>
+        <button id="lg-mobile-filter" type="button" class="btn btn-secondary m-only" onClick="{{ filterSheetToggle }}" aria-expanded="{{ filterSheetOpen }}" aria-label="Open dashboard filters" title="Filters" style="color:{{ fsCol }}"><i class="ph-duotone ph-funnel" style="font-size:18px;color:{{ fsIcol }}"></i><span style="font-size:12px">Filters</span></button>
       </div>
       <div style="position:relative;display:flex;gap:10px;align-items:center;flex-wrap:nowrap;min-width:0;flex:1;justify-content:flex-end">
         <div id="lg-searchwrap" class="m-hide" style="position:relative;flex:0 1 300px;min-width:90px;margin-left:auto">
@@ -459,20 +489,42 @@
       </div>
     </div>
 
-    <div style="display:flex;align-items:center;gap:8px;margin:0 0 14px;padding:9px 11px;border:1px solid {{ dataStatusBorder }};background:{{ dataStatusBg }};border-radius:9px;font-size:12.5px;line-height:1.35">
+    <div class="data-status-banner" title="{{ dataStatusLabel }}" style="display:flex;align-items:center;gap:8px;margin:0 0 14px;padding:9px 11px;border:1px solid {{ dataStatusBorder }};background:{{ dataStatusBg }};border-radius:9px;font-size:12.5px;line-height:1.35">
       <i class="ph-duotone {{ dataStatusIcon }}" style="font-size:16px;color:{{ dataStatusColor }};flex:none"></i>
-      <span style="flex:1;min-width:0">{{ dataStatusLabel }}</span>
+      <span class="m-hide" style="flex:1;min-width:0">{{ dataStatusLabel }}</span>
+      <span class="m-only" style="flex:1">{{ dataStatusMobileLabel }}</span>
       <sc-if value="{{ dataCanRetry }}" hint-placeholder-val="{{ false }}"><button type="button" class="btn btn-ghost" onClick="{{ retryLive }}" style="min-height:30px;padding:4px 8px">Retry</button></sc-if>
     </div>
+    <sc-if value="{{ dataLoading }}" hint-placeholder-val="{{ true }}">
+      <div class="dashboard-state" role="status" aria-live="polite" aria-label="Loading live Shopify dashboard data">
+        <div class="sd-card" style="margin-top:0"><div style="font-size:14px;font-weight:650">Loading live Shopify data</div><div style="font-size:12.5px;opacity:.65;margin-top:4px">Your dashboard will appear when the selected period is ready.</div><div class="dashboard-skeleton-grid" aria-hidden="true"><div class="dashboard-skeleton-block"></div><div class="dashboard-skeleton-block"></div><div class="dashboard-skeleton-block"></div><div class="dashboard-skeleton-block"></div></div></div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ dataUnavailable }}" hint-placeholder-val="{{ false }}">
+      <div class="dashboard-state" role="status">
+        <div class="sd-card" style="margin-top:0"><div style="display:flex;align-items:flex-start;gap:10px"><i class="ph-duotone ph-cloud-slash" style="font-size:20px;color:var(--color-accent-2-700);flex:none"></i><div><div style="font-size:14px;font-weight:650">{{ dataStateTitle }}</div><div style="font-size:12.5px;line-height:1.5;opacity:.68;margin-top:4px">{{ dataStateText }}</div></div></div></div>
+      </div>
+    </sc-if>
 
     <sc-if value="{{ isOverview }}" hint-placeholder-val="{{ true }}">
-      <section id="sec-overview" data-screen-label="Overview">
+      <section id="sec-overview" data-screen-label="Overview" style="display:{{ sectionDisplay }}">
+        <div id="lg-kpistrip" class="m-only">
+          <sc-for list="{{ mobileKpis }}" as="k" hint-placeholder-count="4">
+            <button type="button" onClick="{{ k.pick }}" aria-label="Show {{ k.label }} in the sales chart" style="box-shadow:{{ k.selSh }}">
+              <span style="display:block;font-size:12px;line-height:1.3;opacity:.72">{{ k.label }}</span>
+              <strong style="display:block;font-size:18px;line-height:1.2;margin-top:8px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere">{{ k.val }}</strong>
+              <span style="display:block;font-size:12px;line-height:1.3;margin-top:6px;color:{{ k.dcol }};font-weight:600;overflow-wrap:anywhere">{{ k.delta }}</span>
+            </button>
+          </sc-for>
+        </div>
+        <sc-if value="{{ mobileKpisHasMore }}" hint-placeholder-val="{{ true }}"><button type="button" class="mobile-metrics-toggle m-only" onClick="{{ mobileKpisToggle }}" aria-expanded="{{ mobileKpisExpanded }}"><span>{{ mobileKpisLabel }}</span><i class="ph-duotone {{ mobileKpisIcon }}" style="font-size:14px"></i></button></sc-if>
         <sc-if value="{{ continuous }}" hint-placeholder-val="{{ false }}"><h2 style="font-size:16px;font-weight:650;margin:6px 0 0">Overview</h2></sc-if><div class="sd-card">
 
         <sc-for list="{{ briefL }}" as="b" hint-placeholder-count="1">
-          <div style="max-width:840px;margin-bottom:20px">
+          <div class="morning-brief" style="--brief-lines:{{ mobileBriefLines }};max-width:840px;margin-bottom:20px">
             <div style="font-size:12px;opacity:0.7">Morning brief &middot; {{ b.date }}</div>
             <p style="font-size:15px;line-height:1.6;margin:10px 0 0;text-wrap:pretty">{{ b.text }}</p>
+            <button type="button" class="morning-brief-toggle m-only" onClick="{{ mobileBriefToggle }}" aria-expanded="{{ mobileBriefExpanded }}"><span>{{ mobileBriefLabel }}</span><i class="ph-duotone {{ mobileBriefIcon }}" style="font-size:13px"></i></button>
           </div>
         </sc-for>
 
@@ -532,17 +584,6 @@
         </div><div style="display:contents">
 
         </div><div id="lg-ovchart" class="sd-card"><div class="sd-card-h" id="lg-ovtitle">{{ ovChartTitle }}</div>
-        <div id="lg-kpistrip" class="m-only">
-          <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
-            <div onClick="{{ k.pick }}" style="flex:0 0 calc((100vw - 32px - 28px - 16px) / 3);min-width:0;display:flex;align-items:center;gap:8px;padding:9px 11px;border-radius:10px;border:1px solid var(--sd-line);cursor:pointer;user-select:none;box-shadow:{{ k.selSh }};box-sizing:border-box">
-              <div style="flex:1;min-width:0">
-                <div style="font-size:11px;opacity:0.65;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ k.label }}</div>
-                <div style="font-weight:650;font-size:14.5px;margin-top:2px;font-variant-numeric:tabular-nums;white-space:nowrap">{{ k.val }}</div>
-              </div>
-              <span style="flex:none;font-size:11px;color:{{ k.dcol }};font-weight:600;white-space:nowrap">{{ k.delta }}</span>
-            </div>
-          </sc-for>
-        </div>
         <sc-for list="{{ chartOvL }}" as="chart" hint-placeholder-count="1">
         <div style="position:relative;margin-top:14px">
           <svg viewBox="-34 0 894 318" style="display:block;width:100%;height:auto" onMouseMove="{{ chart.move }}" onMouseLeave="{{ chart.leave }}">
@@ -658,7 +699,7 @@
     </sc-if>
 
     <sc-if value="{{ isChannels }}" hint-placeholder-val="{{ false }}">
-      <section id="sec-channels" data-screen-label="Channels">
+      <section id="sec-channels" data-screen-label="Channels" style="display:{{ sectionDisplay }}">
         <sc-if value="{{ continuous }}" hint-placeholder-val="{{ false }}"><h2 style="font-size:16px;font-weight:650;margin:32px 0 0">Channels</h2></sc-if><div class="sd-card">
         </div><div class="sd-grid2 sd-kpis" style="display:grid;gap:12px;margin-top:16px">
           <sc-for list="{{ chCards }}" as="k" hint-placeholder-count="4">
@@ -740,7 +781,7 @@
     </sc-if>
 
     <sc-if value="{{ isRegions }}" hint-placeholder-val="{{ false }}">
-      <section id="sec-regions" data-screen-label="Regions">
+      <section id="sec-regions" data-screen-label="Regions" style="display:{{ sectionDisplay }}">
         <sc-if value="{{ continuous }}" hint-placeholder-val="{{ false }}"><h2 style="font-size:16px;font-weight:650;margin:32px 0 0">Regions</h2></sc-if><div class="sd-card">
         </div><div class="sd-grid2 sd-kpis" style="display:grid;gap:12px;margin-top:16px">
           <sc-for list="{{ regCards }}" as="k" hint-placeholder-count="4">
@@ -800,7 +841,7 @@
     </sc-if>
 
     <sc-if value="{{ isOrders }}" hint-placeholder-val="{{ false }}">
-      <section id="sec-orders" data-screen-label="Orders">
+      <section id="sec-orders" data-screen-label="Orders" style="display:{{ sectionDisplay }}">
         <sc-if value="{{ continuous }}" hint-placeholder-val="{{ false }}"><h2 style="font-size:16px;font-weight:650;margin:32px 0 0">Orders</h2></sc-if><div class="sd-card">
         </div><div class="sd-grid2 sd-kpis" style="display:grid;gap:12px;margin-top:16px">
           <sc-for list="{{ ordKpis }}" as="k" hint-placeholder-count="6">
@@ -810,7 +851,7 @@
               <div style="font-size:12.5px;margin-top:3px;height:17px"><span style="color:{{ k.dcol }};font-weight:600">{{ k.delta }}</span></div>
             </div>
           </sc-for>
-        </div><div style="display:contents">
+        </div><button type="button" class="mobile-metrics-toggle m-only" onClick="{{ mobileMetricsToggle }}" aria-expanded="{{ mobileMetricsExpanded }}"><span>{{ mobileMetricsLabel }}</span><i class="ph-duotone {{ mobileMetricsIcon }}" style="font-size:14px"></i></button><div style="display:contents">
         </div><div class="sd-card"><div class="sd-card-h">Orders over time</div>
         <sc-for list="{{ chartOrdL }}" as="chart" hint-placeholder-count="1">
         <div style="position:relative;margin-top:14px">
@@ -890,7 +931,7 @@
     </sc-if>
 
     <sc-if value="{{ isProducts }}" hint-placeholder-val="{{ false }}">
-      <section id="sec-products" data-screen-label="Products">
+      <section id="sec-products" data-screen-label="Products" style="display:{{ sectionDisplay }}">
         <sc-if value="{{ continuous }}" hint-placeholder-val="{{ false }}"><h2 style="font-size:16px;font-weight:650;margin:32px 0 0">Products</h2></sc-if><div class="sd-card">
         </div><div class="sd-grid2 sd-kpis" style="display:grid;gap:12px;margin-top:16px">
           <sc-for list="{{ prodKpis }}" as="k" hint-placeholder-count="6">
@@ -900,9 +941,38 @@
               <div style="font-size:12.5px;margin-top:3px;height:17px"><span style="color:{{ k.dcol }};font-weight:600">{{ k.delta }}</span></div>
             </div>
           </sc-for>
-        </div><div style="display:contents">
+        </div><button type="button" class="mobile-metrics-toggle m-only" onClick="{{ mobileMetricsToggle }}" aria-expanded="{{ mobileMetricsExpanded }}"><span>{{ mobileMetricsLabel }}</span><i class="ph-duotone {{ mobileMetricsIcon }}" style="font-size:14px"></i></button><div style="display:contents">
         </div><div class="sd-card"><div class="sd-card-h" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><span>Shopify product catalog</span><div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:nowrap;min-width:0"><select class="input" value="{{ productStatus }}" onChange="{{ setProductStatus }}" aria-label="Filter products by status" style="width:170px;min-width:120px;max-width:45vw;flex:0 1 170px"><option value="active">Active products</option><option value="all">All statuses</option><option value="draft">Draft products</option><option value="archived">Archived products</option></select><div style="position:relative;flex:none"><button type="button" class="btn btn-secondary" onClick="{{ prodColumnsToggle }}" aria-expanded="{{ prodColumnsOpen }}" aria-label="Choose visible product columns" style="white-space:nowrap"><i class="ph-duotone ph-columns" style="font-size:15px"></i> Columns {{ prodColumnCount }} of 13 <i class="ph-duotone ph-caret-down" style="font-size:12px;opacity:0.6"></i></button><sc-if value="{{ prodColumnsOpen }}" hint-placeholder-val="{{ false }}"><div onClick="{{ prodColumnsClose }}" style="position:fixed;inset:0;z-index:49"></div><div class="sd-pop" style="position:absolute;right:0;top:calc(100% + 6px);z-index:50;width:240px;max-width:calc(100vw - 40px);background:var(--sd-card);border:1px solid var(--sd-line);border-radius:12px;box-shadow:var(--shadow-lg);padding:6px"><div style="font-size:11.5px;font-weight:600;opacity:0.6;padding:6px 8px">Visible columns</div><sc-for list="{{ prodColumnOptions }}" as="pco"><button type="button" onClick="{{ pco.toggle }}" aria-pressed="{{ pco.on }}" style="appearance:none;display:flex;align-items:center;gap:9px;width:100%;border:0;background:{{ pco.bg }};color:inherit;font:inherit;font-size:13px;font-weight:{{ pco.wt }};text-align:left;padding:8px;border-radius:7px;cursor:pointer"><i class="ph-duotone {{ pco.icon }}" style="font-size:16px;color:{{ pco.col }};flex:none"></i><span>{{ pco.label }}</span></button></sc-for></div></sc-if></div></div></div>
-        <div style="overflow-x:auto">
+        <div class="prod-mobile-list">
+          <sc-for list="{{ mobileProdRows }}" as="r" hint-placeholder-count="8">
+            <article class="prod-mobile-card" style="background:{{ r.rowBg }}">
+              <div class="prod-mobile-head">
+                <div class="prod-mobile-name">{{ r.name }}<span class="prod-mobile-variant">{{ r.variant }}</span></div>
+                <sc-if value="{{ showProdStatus }}" hint-placeholder-val="{{ true }}"><span class="tag {{ r.statusClass }}">{{ r.status }}</span></sc-if>
+              </div>
+              <div class="prod-mobile-metrics">
+                <sc-if value="{{ showProdPrice }}" hint-placeholder-val="{{ true }}"><div class="prod-mobile-metric"><span>Price</span><strong>{{ r.price }}</strong></div></sc-if>
+                <sc-if value="{{ showProdUnits }}" hint-placeholder-val="{{ true }}"><div class="prod-mobile-metric"><span>Units sold</span><strong>{{ r.units }}</strong></div></sc-if>
+                <sc-if value="{{ showProdStock }}" hint-placeholder-val="{{ true }}"><div class="prod-mobile-metric"><span>Inventory</span><button type="button" class="prod-inventory-expand" onClick="{{ r.toggle }}" aria-expanded="{{ r.expanded }}" aria-label="{{ r.expandLabel }}"><strong>{{ r.stock }}</strong><i class="ph-duotone {{ r.expandIcon }}" style="font-size:13px;color:var(--color-accent-600);flex:none"></i></button></div></sc-if>
+                <sc-if value="{{ showProdSku }}" hint-placeholder-val="{{ false }}"><div class="prod-mobile-metric"><span>SKU</span><strong>{{ r.sku }}</strong></div></sc-if>
+                <sc-if value="{{ showProdSales }}" hint-placeholder-val="{{ false }}"><div class="prod-mobile-metric"><span>Sales</span><strong>{{ r.sales }}</strong></div></sc-if>
+                <sc-if value="{{ showProdMargin }}" hint-placeholder-val="{{ false }}"><div class="prod-mobile-metric"><span>Margin</span><strong>{{ r.margin }}</strong></div></sc-if>
+                <sc-if value="{{ showProdCost }}" hint-placeholder-val="{{ false }}"><div class="prod-mobile-metric"><span>Cost</span><strong>{{ r.cost }}</strong></div></sc-if>
+                <sc-if value="{{ showProdVendor }}" hint-placeholder-val="{{ false }}"><div class="prod-mobile-metric"><span>Vendor</span><strong>{{ r.vendor }}</strong></div></sc-if>
+                <sc-if value="{{ showProdUpdated }}" hint-placeholder-val="{{ false }}"><div class="prod-mobile-metric"><span>Updated</span><strong>{{ r.updated }}</strong></div></sc-if>
+              </div>
+            </article>
+            <sc-if value="{{ r.expanded }}" hint-placeholder-val="{{ false }}">
+              <div class="prod-location-panel">
+                <div><div style="font-weight:650">Inventory by location</div><div style="font-size:12px;opacity:.62;margin-top:2px">{{ r.sku }} · {{ r.locationSummary }}</div></div>
+                <sc-if value="{{ r.hasLocations }}" hint-placeholder-val="{{ true }}"><div class="prod-location-grid"><sc-for list="{{ r.locationRows }}" as="loc" hint-placeholder-count="7"><div class="prod-location-item"><span style="min-width:0;overflow-wrap:anywhere">{{ loc.name }}</span><span style="font-weight:650;font-variant-numeric:tabular-nums;color:{{ loc.col }};white-space:nowrap">{{ loc.available }}</span></div></sc-for></div></sc-if>
+                <sc-if value="{{ r.noLocations }}" hint-placeholder-val="{{ false }}"><div style="font-size:12.5px;opacity:.62;margin-top:10px">No location inventory was returned for this variant.</div></sc-if>
+              </div>
+            </sc-if>
+          </sc-for>
+        </div>
+        <sc-if value="{{ mobileProductsHasMore }}" hint-placeholder-val="{{ false }}"><button type="button" class="mobile-list-more m-only" onClick="{{ mobileProductsMore }}"><span>{{ mobileProductsMoreLabel }}</span><i class="ph-duotone ph-caret-down" style="font-size:14px"></i></button></sc-if>
+        <div class="prod-desktop-table" style="overflow-x:auto">
           <table class="table" style="width:100%;min-width:{{ prodTableMinWidth }}">
             <thead><tr><sc-for list="{{ prodCols }}" as="pc"><th onClick="{{ pc.click }}" title="Sort by this column" style="cursor:pointer;user-select:none;white-space:nowrap;text-align:{{ pc.al }}">{{ pc.label }} <i class="ph-duotone {{ pc.icon }}" style="font-size:11px;opacity:{{ pc.op }}"></i></th></sc-for></tr></thead>
             <tbody>
@@ -974,11 +1044,11 @@
     </sc-if>
 
     <sc-if value="{{ isCustomers }}" hint-placeholder-val="{{ false }}">
-      <section id="sec-customers" data-screen-label="Customers">
+      <section id="sec-customers" data-screen-label="Customers" style="display:{{ sectionDisplay }}">
         <sc-if value="{{ continuous }}" hint-placeholder-val="{{ false }}"><h2 style="font-size:16px;font-weight:650;margin:32px 0 0">Customers</h2></sc-if>
         <div class="sd-grid2 sd-kpis customer-kpis" style="display:grid;gap:12px;margin-top:16px">
           <sc-for list="{{ custKpis }}" as="k" hint-placeholder-count="6"><div style="min-width:0"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="font-size:12.5px;opacity:0.85;border-bottom:1px dotted rgba(var(--lg-ink),0.4);padding-bottom:1px">{{ k.label }}</span></div><div style="font-weight:650;font-size:15px;margin-top:7px;font-variant-numeric:tabular-nums">{{ k.val }}</div><div style="font-size:12.5px;margin-top:3px;min-height:17px"><span style="color:{{ k.dcol }};font-weight:600">{{ k.delta }}</span></div></div></sc-for>
-        </div>
+        </div><button type="button" class="mobile-metrics-toggle m-only" onClick="{{ mobileMetricsToggle }}" aria-expanded="{{ mobileMetricsExpanded }}"><span>{{ mobileMetricsLabel }}</span><i class="ph-duotone {{ mobileMetricsIcon }}" style="font-size:14px"></i></button>
         <div class="sd-card directory-card">
           <div class="sd-card-h directory-toolbar" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
             <div class="dir-tabs" role="tablist" aria-label="Customer directory views"><sc-for list="{{ directoryTabs }}" as="dt"><button type="button" class="dir-tab" role="tab" aria-selected="{{ dt.selected }}" onClick="{{ dt.click }}" style="background:{{ dt.bg }};font-weight:{{ dt.wt }};color:{{ dt.col }}">{{ dt.label }} <span style="opacity:.58">{{ dt.count }}</span></button></sc-for></div>
@@ -987,7 +1057,8 @@
           <div class="directory-note" style="font-size:12.5px;opacity:.62;margin:-4px 0 12px">{{ directoryNote }}</div>
           <sc-if value="{{ directoryHasRows }}" hint-placeholder-val="{{ true }}">
             <div class="dir-desktop-table" style="overflow-x:auto"><table class="table" style="width:100%;min-width:{{ dirTableMinWidth }}"><thead><tr><sc-for list="{{ dirCols }}" as="dc"><th style="text-align:{{ dc.al }};white-space:nowrap"><button type="button" class="dir-sort-button" onClick="{{ dc.click }}" title="Sort by {{ dc.label }}">{{ dc.label }} <i class="ph-duotone {{ dc.icon }}" style="font-size:11px;opacity:{{ dc.op }}"></i></button></th></sc-for></tr></thead><tbody><sc-for list="{{ dirRows }}" as="r" hint-placeholder-count="8"><tr style="background:{{ r.rowBg }}"><sc-for list="{{ r.cells }}" as="cell"><td style="text-align:{{ cell.al }};font-variant-numeric:{{ cell.nums }};white-space:{{ cell.ws }}"><sc-if value="{{ cell.isName }}" hint-placeholder-val="{{ false }}"><button type="button" class="dir-name-btn" onClick="{{ r.toggle }}" aria-expanded="{{ r.expanded }}">{{ cell.value }} <i class="ph-duotone {{ r.expandIcon }}" style="font-size:12px;color:var(--color-accent-600)"></i></button></sc-if><sc-if value="{{ cell.isValue }}" hint-placeholder-val="{{ true }}">{{ cell.value }}</sc-if></td></sc-for></tr><sc-if value="{{ r.expanded }}" hint-placeholder-val="{{ false }}"><tr><td colspan="{{ dirColumnCount }}" style="padding-top:0"><div class="dir-detail"><div style="font-weight:650">{{ r.detailTitle }}</div><div class="dir-detail-lines"><sc-for list="{{ r.detailLines }}" as="dl"><div class="dir-detail-line">{{ dl }}</div></sc-for></div></div></td></tr></sc-if></sc-for></tbody></table></div>
-            <div class="dir-mobile-list"><sc-for list="{{ dirRows }}" as="r" hint-placeholder-count="8"><div><button type="button" class="dir-card" onClick="{{ r.toggle }}" aria-expanded="{{ r.expanded }}"><div class="dir-card-top"><strong style="font-size:14px;line-height:1.35">{{ r.mobileTitle }}</strong><i class="ph-duotone {{ r.expandIcon }}" style="font-size:15px;color:var(--color-accent-600);flex:none"></i></div><div class="dir-card-metrics"><sc-for list="{{ r.mobileMetrics }}" as="mm"><div class="dir-card-metric"><span>{{ mm.label }}</span><strong>{{ mm.value }}</strong></div></sc-for></div></button><sc-if value="{{ r.expanded }}" hint-placeholder-val="{{ false }}"><div class="dir-detail"><div style="font-weight:650">{{ r.detailTitle }}</div><div class="dir-detail-lines"><sc-for list="{{ r.detailLines }}" as="dl"><div class="dir-detail-line">{{ dl }}</div></sc-for></div></div></sc-if></div></sc-for></div>
+            <div class="dir-mobile-list"><sc-for list="{{ mobileDirRows }}" as="r" hint-placeholder-count="8"><div><button type="button" class="dir-card" onClick="{{ r.toggle }}" aria-expanded="{{ r.expanded }}"><div class="dir-card-top"><strong style="font-size:14px;line-height:1.35">{{ r.mobileTitle }}</strong><i class="ph-duotone {{ r.expandIcon }}" style="font-size:15px;color:var(--color-accent-600);flex:none"></i></div><div class="dir-card-metrics"><sc-for list="{{ r.mobileMetrics }}" as="mm"><div class="dir-card-metric"><span>{{ mm.label }}</span><strong>{{ mm.value }}</strong></div></sc-for></div></button><sc-if value="{{ r.expanded }}" hint-placeholder-val="{{ false }}"><div class="dir-detail"><div style="font-weight:650">{{ r.detailTitle }}</div><div class="dir-detail-lines"><sc-for list="{{ r.detailLines }}" as="dl"><div class="dir-detail-line">{{ dl }}</div></sc-for></div></div></sc-if></div></sc-for></div>
+            <sc-if value="{{ mobileDirectoryHasMore }}" hint-placeholder-val="{{ false }}"><button type="button" class="mobile-list-more m-only" onClick="{{ mobileDirectoryMore }}"><span>{{ mobileDirectoryMoreLabel }}</span><i class="ph-duotone ph-caret-down" style="font-size:14px"></i></button></sc-if>
           </sc-if>
           <sc-if value="{{ directoryEmpty }}" hint-placeholder-val="{{ false }}"><div style="padding:34px 12px;text-align:center"><i class="ph-duotone ph-buildings" style="font-size:28px;color:var(--color-accent-500)"></i><div style="font-weight:650;margin-top:8px">{{ directoryEmptyTitle }}</div><div style="font-size:13px;opacity:.65;margin-top:4px">{{ directoryEmptyText }}</div></div></sc-if>
         </div>
@@ -995,7 +1066,7 @@
     </sc-if>
 
     <sc-if value="{{ isAds }}" hint-placeholder-val="{{ false }}">
-      <section id="sec-ads" data-screen-label="Ads">
+      <section id="sec-ads" data-screen-label="Ads" style="display:{{ sectionDisplay }}">
         <sc-if value="{{ continuous }}" hint-placeholder-val="{{ false }}"><h2 style="font-size:16px;font-weight:650;margin:32px 0 0">Ads</h2></sc-if>
         <sc-if value="{{ adUnavailable }}" hint-placeholder-val="{{ false }}">
           <div class="sd-card"><div class="sd-card-h">Advertising data unavailable</div><div style="font-size:13.5px;line-height:1.55;opacity:0.7">Google Ads and Meta Ads are not connected. No spend, attribution, ROAS, campaign, or conversion figures are being estimated.</div></div>
@@ -1088,7 +1159,7 @@
     </sc-if>
 
     <sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
-      <section id="sec-settings" data-screen-label="Settings"><div class="sd-card">
+      <section id="sec-settings" data-screen-label="Settings" style="display:{{ sectionDisplay }}"><div class="sd-card">
         <div style="font-size:13px;font-weight:600;margin-bottom:20px">Brand</div>
         <div style="display:grid;grid-template-columns:minmax(130px,200px) minmax(0,1fr);gap:20px 26px;align-items:center;margin-bottom:48px">
           <div style="font-size:14.5px">Company name</div>
@@ -1428,7 +1499,7 @@ class Component extends DCLogic {
       theme:(hp.t && this.THEMES.some(t => t[0] === hp.t)) ? hp.t : (hp.d === '1' ? 'ink' : (ls.theme && this.THEMES.some(t => t[0] === ls.theme) ? ls.theme : 'paper')),
       accent:'custom',
       accentHex:(hp.ah && /^[0-9a-fA-F]{6}$/.test(hp.ah)) ? '#' + hp.ah : (ls.brandV === 2 && ls.accentHex ? ls.accentHex : '#c9377e'),
-      hsv:null, accHexDraft:null, accPickOpen:false, searchQ:'', searchExp:false, selKpi:'total', salesBreakdownOpen:false, chartOn:{}, ordSort:null, prodSort:null, productStatus:'active', expandedProduct:null, prodColumnsOpen:false,
+      hsv:null, accHexDraft:null, accPickOpen:false, searchQ:'', searchExp:false, selKpi:'total', salesBreakdownOpen:false, mobileKpisOpen:false, mobileMetricsOpen:false, mobileBriefOpen:false, mobileProductLimit:20, mobileDirectoryLimit:20, chartOn:{}, ordSort:null, prodSort:null, productStatus:'active', expandedProduct:null, prodColumnsOpen:false,
       prodColOn:{ name:true, sku:false, status:true, vendor:false, tags:false, price:true, cost:false, gm:false, units:true, sales:false, stock:true, locations:false, updatedAt:false },
       directoryTab:'customers', directoryColumnsOpen:false, dirSort:null, expandedDirectory:null,
       dirColOn:{
@@ -1943,6 +2014,7 @@ class Component extends DCLogic {
     this._kpiOrd = kpiOrd;
     const kpis = kpiOrd.map(k2 => kpisAll.find(x => x.k === k2)).filter(x => x && (st.kpiOn[x.k] ?? true))
       .map(x => ({ ...x, pick:() => this.setState({ selKpi:x.k, hi:null }), selSh:(st.selKpi || 'total') === x.k ? 'inset 0 0 0 2px var(--color-accent-500)' : 'none' }));
+    const mobileKpis = st.mobileKpisOpen ? kpis : kpis.slice(0, 4);
     const salesBreakdown = [
       { label:'Gross sales', value:this.money2(cur.s), wt:'500', col:'inherit', bg:'transparent' },
       { label:'Discounts', value:this.signedMoney2(-cur.dsc), wt:'500', col:'inherit', bg:'var(--color-neutral-100)' },
@@ -2353,7 +2425,7 @@ class Component extends DCLogic {
     const dirColumnOptions = dirDef.map(([k2,label])=>{const on=!!dirOn[k2];return{label,on,icon:on?'ph-check-square':'ph-square',col:on?'var(--color-accent-700)':'inherit',bg:on?'var(--color-neutral-200)':'transparent',wt:on?'600':'400',toggle:()=>{if(on&&dirColumnCount===1)return;this.setState({dirColOn:{...st.dirColOn,[st.directoryTab]:{...dirOn,[k2]:!on}},dirSort:on&&ds.col===k2?null:st.dirSort});}};});
     const cellText=(r,k2)=>k2==='spend'?r.spendText:k2==='lastOrder'?r.lastOrderText:k2==='firstOrder'?r.firstOrderText:k2==='aov'?r.aovText:k2==='refunds'?r.refundsText:k2==='customerSince'?r.customerSinceText:(r[k2]??'—');
     const dirRows=dirSource.slice().sort((a,b)=>{const x=a[ds.col],y=b[ds.col];return(typeof x==='number'&&typeof y==='number'?x-y:String(x||'').localeCompare(String(y||'')))*ds.dir;}).map(r=>{const expanded=st.expandedDirectory===r.key;const cells=dirDef.filter(([k2])=>dirOn[k2]).map(([k2,,al],i)=>({value:cellText(r,k2),al,isName:i===0,isValue:i!==0,nums:al==='right'?'tabular-nums':'normal',ws:['lastOrder','firstOrder','customerSince'].includes(k2)?'nowrap':'normal'}));const metricDefs=dirDef.filter(([k2])=>dirOn[k2]&&k2!=='name').slice(0,4);return{...r,cells,expanded,rowBg:expanded?'var(--color-accent-100)':'transparent',expandIcon:expanded?'ph-caret-up':'ph-caret-down',toggle:()=>this.setState({expandedDirectory:expanded?null:r.key}),detailTitle:(st.directoryTab==='customers'?'Customer':st.directoryTab==='companies'?'Company':'Location')+' details',mobileTitle:r.name,mobileMetrics:metricDefs.map(([k2,label])=>({label,value:cellText(r,k2)}))};});
-    const directoryTabs=[['customers','Customers',directorySummary.customers],['companies','Companies',directorySummary.companies],['locations','Locations',directorySummary.locations]].map(([k2,label,count])=>{const selected=st.directoryTab===k2;return{label,count:this.num(+count||0),selected,bg:selected?'var(--sd-card)':'transparent',col:selected?'var(--color-accent-800)':'inherit',wt:selected?'650':'450',click:()=>this.setState({directoryTab:k2,dirSort:null,expandedDirectory:null,directoryColumnsOpen:false})};});
+    const directoryTabs=[['customers','Customers',directorySummary.customers],['companies','Companies',directorySummary.companies],['locations','Locations',directorySummary.locations]].map(([k2,label,count])=>{const selected=st.directoryTab===k2;return{label,count:this.num(+count||0),selected,bg:selected?'var(--sd-card)':'transparent',col:selected?'var(--color-accent-800)':'inherit',wt:selected?'650':'450',click:()=>this.setState({directoryTab:k2,dirSort:null,expandedDirectory:null,directoryColumnsOpen:false,mobileDirectoryLimit:20})};});
     const directoryNote=(+directorySummary.companies||0)||(+directorySummary.locations||0)?'Live Shopify customer and B2B directory · protected contact fields remain server-side':'Customer records are ready. B2B companies and locations will appear after the disabled complete directory workflow is credentialed and run.';
     const directoryHasRows=dirRows.length>0, directoryEmpty=!directoryHasRows;
     const directoryEmptyTitle=st.directoryTab==='customers'?'No customers returned':st.directoryTab==='companies'?'No B2B companies returned':'No B2B locations returned';
@@ -2504,7 +2576,12 @@ class Component extends DCLogic {
             : { label:'Shopify data is temporarily unavailable — retry', icon:'ph-cloud-slash', color:'var(--color-accent-2-700)', bg:'var(--color-accent-2-100)', border:'var(--color-accent-2-300)' };
     return {
       navItems, flags:flags.map(f => ({ ...f, goBell:() => { this.setState({ bellOpen:false }); f.go(); } })), briefL, pnl, anomalyFeed, hasAnoms, amzRows, hasAmz, exportCsv,
-      dataStatusLabel:statusMap.label, dataStatusIcon:statusMap.icon, dataStatusColor:statusMap.color, dataStatusBg:statusMap.bg, dataStatusBorder:statusMap.border,
+      dataStatusLabel:statusMap.label,
+      dataStatusMobileLabel:st.dataStatus === 'loading' ? 'Connecting to Shopify…' : st.dataStatus === 'live' && reconciliationIssue ? 'Shopify reconciliation in progress' : st.dataStatus === 'live' && !stale ? 'Shopify data synced' : st.dataStatus === 'live' ? 'Shopify data needs refresh' : st.dataStatus === 'empty' ? 'No Shopify records in this period' : 'Shopify data unavailable',
+      dataStatusIcon:statusMap.icon, dataStatusColor:statusMap.color, dataStatusBg:statusMap.bg, dataStatusBorder:statusMap.border,
+      sectionDisplay:st.dataStatus === 'live' ? 'block' : 'none', dataLoading:st.dataStatus === 'loading', dataUnavailable:st.dataStatus === 'error' || st.dataStatus === 'empty',
+      dataStateTitle:st.dataStatus === 'empty' ? 'No Shopify records in this period' : 'Live Shopify data could not be loaded',
+      dataStateText:st.dataStatus === 'empty' ? 'Change the date or channel filters to view another period.' : 'Retry the live connection. Sample data is intentionally hidden so it cannot be mistaken for Shopify data.',
       dataCanRetry:st.dataStatus === 'error' || st.dataStatus === 'empty', retryLive:() => this.loadLiveData(),
       searchQ:st.searchQ || '', searchOpen:!!sq && searchResults.length > 0, searchResults,
       searchExpanded:st.searchExp, searchCollapsed:!st.searchExp,
@@ -2524,6 +2601,9 @@ class Component extends DCLogic {
       filterSheetOpen:!!st.filterSheet,
       filterSheetToggle:() => this.setState({ filterSheet:!st.filterSheet, navMenu:false, bellOpen:false }),
       filterSheetClose:() => this.setState({ filterSheet:false }),
+      mobileKpis, mobileKpisHasMore:kpis.length > 4, mobileKpisExpanded:st.mobileKpisOpen ? 'true' : 'false', mobileKpisLabel:st.mobileKpisOpen ? 'Show fewer metrics' : 'View more metrics', mobileKpisIcon:st.mobileKpisOpen ? 'ph-caret-up' : 'ph-caret-down', mobileKpisToggle:() => this.setState({ mobileKpisOpen:!st.mobileKpisOpen }),
+      mobileExtraDisplay:st.mobileMetricsOpen ? 'block' : 'none', mobileMetricsExpanded:st.mobileMetricsOpen ? 'true' : 'false', mobileMetricsLabel:st.mobileMetricsOpen ? 'Show fewer metrics' : 'View more metrics', mobileMetricsIcon:st.mobileMetricsOpen ? 'ph-caret-up' : 'ph-caret-down', mobileMetricsToggle:() => this.setState({ mobileMetricsOpen:!st.mobileMetricsOpen }),
+      mobileBriefLines:st.mobileBriefOpen ? '999' : '2', mobileBriefExpanded:st.mobileBriefOpen ? 'true' : 'false', mobileBriefLabel:st.mobileBriefOpen ? 'Show less' : 'Read full brief', mobileBriefIcon:st.mobileBriefOpen ? 'ph-caret-up' : 'ph-caret-down', mobileBriefToggle:() => this.setState({ mobileBriefOpen:!st.mobileBriefOpen }),
       fsCol:st.filterSheet ? 'var(--color-accent-800)' : 'inherit', fsIcol:st.filterSheet ? 'var(--color-accent-600)' : 'var(--color-neutral-700)',
       fsCmpItems:[['none','None'],['prev','Previous period'],['py','Previous year'],['pydow','Prev. year (same weekday)'],['custom','Custom\u2026']].map(([k, label]) => {
         const act = st.cmpMode === k;
@@ -2669,13 +2749,15 @@ class Component extends DCLogic {
       isOverview:st.continuous || st.view === 'overview', isChannels:st.continuous || st.view === 'channels', isRegions:st.continuous || st.view === 'regions',
       isOrders:st.continuous || st.view === 'orders', isProducts:st.continuous || st.view === 'products', isCustomers:st.continuous || st.view === 'customers',
       isAds:st.continuous || st.view === 'ads', adUnavailable:st.dataStatus === 'live', adDataAvailable:st.dataStatus !== 'live', adKpis, chartAdsL:[chartAds], adPlatRows, adCampCols, adCampRows,
-      ordCols, ordTagQ, ordTagInput:e => this.setState({ ordTagQ:e.target.value }), ordTagReset:() => this.setState({ ordTagQ:'' }), productStatus:st.productStatus, setProductStatus:e => this.setState({ productStatus:e.target.value, prodSort:null, expandedProduct:null, prodColumnsOpen:false }), prodCols,
+      ordCols, ordTagQ, ordTagInput:e => this.setState({ ordTagQ:e.target.value }), ordTagReset:() => this.setState({ ordTagQ:'' }), productStatus:st.productStatus, setProductStatus:e => this.setState({ productStatus:e.target.value, prodSort:null, expandedProduct:null, prodColumnsOpen:false, mobileProductLimit:20 }), prodCols,
       prodColumnOptions, prodColumnCount, prodTableMinWidth:Math.max(720, 220 + Math.max(0, prodColumnCount - 1) * 105) + 'px', prodColumnsOpen:st.prodColumnsOpen,
       prodColumnsToggle:() => this.setState({ prodColumnsOpen:!st.prodColumnsOpen }), prodColumnsClose:() => this.setState({ prodColumnsOpen:false }),
       showProdName:!!st.prodColOn.name, showProdSku:!!st.prodColOn.sku, showProdStatus:!!st.prodColOn.status, showProdVendor:!!st.prodColOn.vendor, showProdTags:!!st.prodColOn.tags,
       showProdPrice:!!st.prodColOn.price, showProdCost:!!st.prodColOn.cost, showProdMargin:!!st.prodColOn.gm, showProdUnits:!!st.prodColOn.units, showProdSales:!!st.prodColOn.sales,
       showProdStock:!!st.prodColOn.stock, showProdLocations:!!st.prodColOn.locations, showProdUpdated:!!st.prodColOn.updatedAt,
+      mobileProdRows:prodRows.slice(0, st.mobileProductLimit || 20), mobileProductsHasMore:prodRows.length > (st.mobileProductLimit || 20), mobileProductsMoreLabel:'Show ' + Math.min(20, Math.max(0, prodRows.length - (st.mobileProductLimit || 20))) + ' more products', mobileProductsMore:()=>this.setState({ mobileProductLimit:(st.mobileProductLimit || 20) + 20 }),
       directoryTabs, directoryNote, directoryHasRows, directoryEmpty, directoryEmptyTitle, directoryEmptyText, dirCols, dirRows,
+      mobileDirRows:dirRows.slice(0, st.mobileDirectoryLimit || 20), mobileDirectoryHasMore:dirRows.length > (st.mobileDirectoryLimit || 20), mobileDirectoryMoreLabel:'Show ' + Math.min(20, Math.max(0, dirRows.length - (st.mobileDirectoryLimit || 20))) + ' more', mobileDirectoryMore:()=>this.setState({ mobileDirectoryLimit:(st.mobileDirectoryLimit || 20) + 20 }),
       dirColumnOptions, dirColumnCount, dirColumnTotal:dirDef.length, dirTableMinWidth:Math.max(660, 210 + Math.max(0, dirColumnCount - 1) * 120) + 'px', dirColumnsOpen:st.directoryColumnsOpen,
       dirColumnsToggle:()=>this.setState({directoryColumnsOpen:!st.directoryColumnsOpen}), dirColumnsClose:()=>this.setState({directoryColumnsOpen:false}),
       kpis, salesBreakdown, salesBreakdownOpen:st.salesBreakdownOpen, salesBreakdownExpanded:st.salesBreakdownOpen ? 'true' : 'false',

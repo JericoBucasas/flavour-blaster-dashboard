@@ -75,6 +75,19 @@ test('selected date range stays readable on one line in the desktop control bar'
   assert.match(source, /class="sd-date-btn-label">\{\{ dateBtnLabel \}\}<\/span>/);
 });
 
+test('mobile dashboard is title-first, truthful, progressive, and touch accessible', () => {
+  const source = fs.readFileSync('Sales Dashboard v2.dc.html', 'utf8');
+  assert.match(source, /#lg-kpistrip \{ display:grid !important;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.doesNotMatch(source, /Shopify-app order: the sales chart sits above the Overview title bar/);
+  assert.match(source, /Sample data is intentionally hidden so it cannot be mistaken for Shopify data\./);
+  assert.match(source, /<button type="button" onClick="\{\{ n\.goMenu \}\}" aria-label="Open \{\{ n\.label \}\}"/);
+  assert.match(source, /id="lg-mobile-filter" type="button"/);
+  assert.match(source, /class="prod-mobile-list"/);
+  assert.match(source, /mobileProdRows:prodRows\.slice\(0, st\.mobileProductLimit \|\| 20\)/);
+  assert.match(source, /mobileDirRows:dirRows\.slice\(0, st\.mobileDirectoryLimit \|\| 20\)/);
+  assert.match(source, /class="morning-brief-toggle m-only"/);
+});
+
 test('dashboard keeps the public address at the canonical root URL', () => {
   const source = fs.readFileSync('Sales Dashboard v2.dc.html', 'utf8');
   const routing = JSON.parse(fs.readFileSync('vercel.json', 'utf8'));
