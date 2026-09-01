@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parseDate, buildSnapshotRequest, buildCatalogRequest, buildDirectoryRequest, sanitizeSnapshot } = require('../lib/dashboard-request');
+const { parseDate, buildSnapshotRequest, buildCatalogRequest, buildDirectoryRequest, buildTrafficRequest, sanitizeSnapshot, sanitizeTraffic, unavailableTraffic } = require('../lib/dashboard-request');
 
 test('parseDate accepts ISO dates and falls back safely', () => {
   assert.equal(parseDate('2026-08-20', '2025-01-01'), '2026-08-20');
@@ -37,6 +37,22 @@ test('directory request keeps the secret server-side and targets the safe direct
 test('directory request clamps the server-side page size', () => {
   const request = buildDirectoryRequest('https://hnmmlfelaezmijbbwzsg.supabase.co/', '[test-secret]', 5000);
   assert.deepEqual(JSON.parse(request.options.body), { p_limit:500 });
+});
+
+test('traffic request keeps the secret server-side and targets the GA4 reporting RPC', () => {
+  const request = buildTrafficRequest('https://hnmmlfelaezmijbbwzsg.supabase.co/', '[test-secret]', '2025-01-01', '2026-08-20');
+  assert.equal(request.url, 'https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/rpc/fb_ga4_dashboard_snapshot');
+  assert.equal(request.options.headers.apikey, '[test-secret]');
+  assert.equal(request.options.headers.Authorization, undefined);
+  assert.deepEqual(JSON.parse(request.options.body), { p_start:'2025-01-01', p_end:'2026-08-20' });
+});
+
+test('traffic response enforces the aggregate-only dashboard contract', () => {
+  const data = sanitizeTraffic({ propertyId:298253309, status:'stale', daily:[{ day:'2026-08-20', sessions:12 }], channelGroups:[], sourceMedium:[], countries:[], devices:[], landingPages:[] });
+  assert.equal(data.propertyId, 298253309);
+  assert.equal(data.status, 'stale');
+  assert.equal(data.daily[0].sessions, 12);
+  assert.equal(unavailableTraffic().status, 'unavailable');
 });
 
 test('snapshot response keeps complete order references and display names', () => {

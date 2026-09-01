@@ -108,3 +108,17 @@ test('live loader scopes the request to the active dashboard section', async () 
   await context.window.FlavourBlasterLive.load('/api/dashboard', '2026-08-19', '2026-08-20', 'orders');
   assert.equal(requestedUrl, '/api/dashboard?start=2026-08-19&end=2026-08-20&section=orders');
 });
+
+test('long-range merge deduplicates GA4 daily and regional dimension rows', () => {
+  const merged = runtime().mergePayloads([
+    { traffic:{ status:'live', propertyId:298253309, coverageStart:'2025-01-01', coverageEnd:'2025-12-31', lastSuccessAt:'2026-08-20T12:25:00Z', daily:[{ day:'2025-12-31', sessions:10 }], channelGroups:[{ day:'2025-12-31', key:'gb:Organic Search', regionCode:'gb', sessions:8 }], sourceMedium:[], countries:[], devices:[], landingPages:[] } },
+    { traffic:{ status:'stale', propertyId:298253309, coverageStart:'2025-12-31', coverageEnd:'2026-08-20', lastSuccessAt:'2026-08-20T18:25:00Z', daily:[{ day:'2025-12-31', sessions:12 }, { day:'2026-01-01', sessions:7 }], channelGroups:[{ day:'2025-12-31', key:'gb:Organic Search', regionCode:'gb', sessions:9 }], sourceMedium:[], countries:[], devices:[], landingPages:[] } },
+  ], '2025-01-01', '2026-08-20');
+  assert.equal(merged.traffic.status, 'stale');
+  assert.equal(merged.traffic.coverageStart, '2025-01-01');
+  assert.equal(merged.traffic.coverageEnd, '2026-08-20');
+  assert.equal(merged.traffic.daily.length, 2);
+  assert.equal(merged.traffic.daily.find((row) => row.day === '2025-12-31').sessions, 12);
+  assert.equal(merged.traffic.channelGroups.length, 1);
+  assert.equal(merged.traffic.channelGroups[0].sessions, 9);
+});

@@ -15,6 +15,10 @@ function response() {
   };
 }
 
+function traffic(overrides = {}) {
+  return { status:'live', propertyId:298253309, coverageStart:'2025-01-01', coverageEnd:'2026-08-20', lastSuccessAt:'2026-08-20T18:25:00Z', provisionalThrough:null, daily:[], channelGroups:[], sourceMedium:[], countries:[], devices:[], landingPages:[], ...overrides };
+}
+
 test('dashboard API rejects unsupported methods', async () => {
   const res = response();
   await handler({ method:'POST', query:{} }, res);
@@ -68,6 +72,7 @@ test('dashboard API merges sales, product catalog, and customer company director
     requests.push(url);
     if (url.endsWith('/fb_dashboard_snapshot_v7')) return { ok:true, json:async () => ({ daily:[], recentOrders:[] }) };
     if (url.endsWith('/fb_product_catalog')) return { ok:true, json:async () => ({ summary:{ products:173 }, products:[{ title:'Product' }] }) };
+    if (url.endsWith('/fb_ga4_dashboard_snapshot')) return { ok:true, json:async () => traffic() };
     return { ok:true, json:async () => ({ summary:{ customers:243 }, customers:[{ name:'Customer' }], companies:[], locations:[] }) };
   };
   try {
@@ -79,7 +84,8 @@ test('dashboard API merges sales, product catalog, and customer company director
     assert.equal(res.body.data.productCatalog.products.length, 1);
     assert.equal(res.body.data.customerDirectory.summary.customers, 243);
     assert.equal(res.body.data.customerDirectory.customers.length, 1);
-    assert.equal(requests.length, 3);
+    assert.equal(res.body.data.traffic.propertyId, 298253309);
+    assert.equal(requests.length, 4);
   } finally {
     global.fetch = previousFetch;
     if (previousUrl == null) delete process.env.SUPABASE_URL; else process.env.SUPABASE_URL = previousUrl;
@@ -128,6 +134,7 @@ test('dashboard API preserves the database-bounded directory page and complete t
         customersTotal:29405, companiesTotal:399, locationsTotal:934 },
       customers, companies, locations,
     }) },
+    { ok:true, json:async () => traffic() },
   ];
   global.fetch = async () => fetchCalls.shift();
   try {
@@ -149,6 +156,29 @@ test('dashboard API preserves the database-bounded directory page and complete t
       locationsTotal: 934,
     });
     assert.equal(res.headers['Cache-Control'], 'private, no-store, max-age=0');
+  } finally {
+    global.fetch = previousFetch;
+    if (previousUrl == null) delete process.env.SUPABASE_URL; else process.env.SUPABASE_URL = previousUrl;
+    if (previousKey == null) delete process.env.SUPABASE_SECRET_KEY; else process.env.SUPABASE_SECRET_KEY = previousKey;
+  }
+});
+
+test('dashboard API keeps Shopify live when GA4 is temporarily unavailable', async () => {
+  const previousUrl = process.env.SUPABASE_URL;
+  const previousKey = process.env.SUPABASE_SECRET_KEY;
+  const previousFetch = global.fetch;
+  process.env.SUPABASE_URL = 'https://hnmmlfelaezmijbbwzsg.supabase.co';
+  process.env.SUPABASE_SECRET_KEY = '[test-secret]';
+  global.fetch = async (url) => url.endsWith('/fb_ga4_dashboard_snapshot')
+    ? { ok:false, status:404, json:async () => ({ message:'function unavailable' }) }
+    : { ok:true, status:200, json:async () => ({ daily:[], recentOrders:[] }) };
+  try {
+    const res = response();
+    await handler({ method:'GET', query:{ start:'2026-08-19', end:'2026-08-20', section:'overview' } }, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.status, 'live');
+    assert.equal(res.body.data.traffic.status, 'unavailable');
+    assert.equal(res.body.data.traffic.code, 'GA4_DATASTORE_QUERY_FAILED');
   } finally {
     global.fetch = previousFetch;
     if (previousUrl == null) delete process.env.SUPABASE_URL; else process.env.SUPABASE_URL = previousUrl;

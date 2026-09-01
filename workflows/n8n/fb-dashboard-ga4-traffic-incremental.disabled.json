@@ -1,0 +1,1184 @@
+{
+  "name": "FB Dashboard | GA4 Traffic Incremental [DISABLED]",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## GA4 TRAFFIC INCREMENTAL\nDisabled source-controlled template. After the contact@ read-only GA4 credential is connected and the bounded verification passes, import a production copy named **FB Dashboard | GA4 Traffic Incremental [LIVE]**. The live copy runs every six hours at :20 London time, re-reads today plus three prior days, replaces each dimension grain transactionally, and advances the checkpoint only after every write succeeds.",
+        "height": 320,
+        "width": 520
+      },
+      "id": "workflow-note",
+      "name": "Implementation Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -760,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 20 */6 * * *"
+            }
+          ]
+        }
+      },
+      "id": "ga4-schedule",
+      "name": "Schedule - Every 6 Hours at :20 (London)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -660,
+        80
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Manual Test Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -660,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const DEVELOPMENT_GATE = false;\nif (!DEVELOPMENT_GATE) throw new Error('GA4_DEVELOPMENT_GATE_CLOSED');\nreturn $input.all();"
+      },
+      "id": "closed-development-gate",
+      "name": "Closed Development Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -430,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB',{ timeZone:'Europe/London', year:'numeric', month:'2-digit', day:'2-digit' }).formatToParts(new Date()).filter(p=>p.type!=='literal').map(p=>[p.type,p.value]));\nconst today = `${parts.year}-${parts.month}-${parts.day}`;\nconst endMs = Date.parse(today + 'T00:00:00Z');\nconst start = new Date(endMs - 3 * 86400000).toISOString().slice(0,10);\nreturn [{ json:{ propertyId:298253309, start, end:today, today, runStartedAt:new Date().toISOString(), scheduleTimezone:'Europe/London', overlapDays:3 } }];"
+      },
+      "id": "current-ga4-window",
+      "name": "Current GA4 Window",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -180,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "report",
+        "operation": "get",
+        "propertyType": "ga4",
+        "propertyId": {
+          "mode": "id",
+          "value": "298253309"
+        },
+        "dateRange": "custom",
+        "startDate": "={{ $('Current GA4 Window').first().json.start + 'T00:00:00.000Z' }}",
+        "endDate": "={{ $('Current GA4 Window').first().json.end + 'T23:59:59.999Z' }}",
+        "metricsGA4": {
+          "metricValues": [
+            {
+              "listName": "sessions"
+            },
+            {
+              "listName": "engagedSessions"
+            },
+            {
+              "listName": "eventCount"
+            },
+            {
+              "listName": "addToCarts"
+            },
+            {
+              "listName": "checkouts"
+            },
+            {
+              "listName": "ecommercePurchases"
+            },
+            {
+              "listName": "purchaseRevenue"
+            }
+          ]
+        },
+        "dimensionsGA4": {
+          "dimensionValues": [
+            {
+              "listName": "date"
+            }
+          ]
+        },
+        "returnAll": true,
+        "simple": true,
+        "additionalFields": {
+          "currencyCode": "GBP",
+          "keepEmptyRows": true
+        }
+      },
+      "id": "ga4-report-daily",
+      "name": "GA4 Report | daily",
+      "type": "n8n-nodes-base.googleAnalytics",
+      "typeVersion": 2,
+      "position": [
+        80,
+        140
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "googleAnalyticsOAuth2": {
+          "id": "FB_GA4_OAUTH_REQUIRED",
+          "name": "Flavour Blaster GA4 contact@ [REQUIRED]"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const window = $('Current GA4 Window').first().json;\nconst runAt = window.runStartedAt || new Date().toISOString();\nconst isoDay = value => { const s = String(value || ''); if (!/^\\d{8}$/.test(s)) throw new Error('GA4_DATE_INVALID:' + s); return s.slice(0,4) + '-' + s.slice(4,6) + '-' + s.slice(6,8); };\nconst num = value => { const n = Number(value); return Number.isFinite(n) ? n : 0; };\nconst metric = row => ({ sessions:Math.max(0, Math.round(num(row.sessions))), engaged_sessions:Math.max(0, Math.round(num(row.engagedSessions))), event_count:Math.max(0, Math.round(num(row.eventCount))), add_to_carts:Math.max(0, Math.round(num(row.addToCarts))), checkouts:Math.max(0, Math.round(num(row.checkouts))), ecommerce_purchases:Math.max(0, Math.round(num(row.ecommercePurchases))), purchase_revenue:num(row.purchaseRevenue), is_provisional:isoDay(row.date) === window.today, source_updated_at:runAt });\nconst rows = $input.all().map(item => { const row = item.json; return { property_id:298253309, day:isoDay(row.date), currency_code:'GBP', ...metric(row) }; });\nreturn [{ json:{ ...window, dimensionType:'daily', rows } }];"
+      },
+      "id": "normalize-daily",
+      "name": "Normalize GA4 | daily",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/rpc/fb_ga4_upsert_daily",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            },
+            {
+              "name": "User-Agent",
+              "value": "FlavourBlasterDashboard-n8n/1.0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ p_rows:$json.rows }) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "supabase-upsert-daily",
+      "name": "Supabase Upsert GA4 daily [CREDENTIAL REQUIRED]",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        140
+      ],
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "report",
+        "operation": "get",
+        "propertyType": "ga4",
+        "propertyId": {
+          "mode": "id",
+          "value": "298253309"
+        },
+        "dateRange": "custom",
+        "startDate": "={{ $('Current GA4 Window').first().json.start + 'T00:00:00.000Z' }}",
+        "endDate": "={{ $('Current GA4 Window').first().json.end + 'T23:59:59.999Z' }}",
+        "metricsGA4": {
+          "metricValues": [
+            {
+              "listName": "sessions"
+            },
+            {
+              "listName": "engagedSessions"
+            },
+            {
+              "listName": "eventCount"
+            },
+            {
+              "listName": "addToCarts"
+            },
+            {
+              "listName": "checkouts"
+            },
+            {
+              "listName": "ecommercePurchases"
+            },
+            {
+              "listName": "purchaseRevenue"
+            }
+          ]
+        },
+        "dimensionsGA4": {
+          "dimensionValues": [
+            {
+              "listName": "date"
+            },
+            {
+              "listName": "countryId"
+            },
+            {
+              "listName": "sessionDefaultChannelGroup"
+            }
+          ]
+        },
+        "returnAll": true,
+        "simple": true,
+        "additionalFields": {
+          "currencyCode": "GBP",
+          "keepEmptyRows": true
+        }
+      },
+      "id": "ga4-report-channel_group",
+      "name": "GA4 Report | channel_group",
+      "type": "n8n-nodes-base.googleAnalytics",
+      "typeVersion": 2,
+      "position": [
+        800,
+        140
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "googleAnalyticsOAuth2": {
+          "id": "FB_GA4_OAUTH_REQUIRED",
+          "name": "Flavour Blaster GA4 contact@ [REQUIRED]"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const window = $('Current GA4 Window').first().json;\nconst runAt = window.runStartedAt || new Date().toISOString();\nconst isoDay = value => { const s = String(value || ''); if (!/^\\d{8}$/.test(s)) throw new Error('GA4_DATE_INVALID:' + s); return s.slice(0,4) + '-' + s.slice(4,6) + '-' + s.slice(6,8); };\nconst num = value => { const n = Number(value); return Number.isFinite(n) ? n : 0; };\nconst metric = row => ({ sessions:Math.max(0, Math.round(num(row.sessions))), engaged_sessions:Math.max(0, Math.round(num(row.engagedSessions))), event_count:Math.max(0, Math.round(num(row.eventCount))), add_to_carts:Math.max(0, Math.round(num(row.addToCarts))), checkouts:Math.max(0, Math.round(num(row.checkouts))), ecommerce_purchases:Math.max(0, Math.round(num(row.ecommercePurchases))), purchase_revenue:num(row.purchaseRevenue), is_provisional:isoDay(row.date) === window.today, source_updated_at:runAt });\nconst eu = new Set(['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE']);\nconst region = code => code === 'US' ? 'us' : code === 'GB' ? 'gb' : code === 'AU' ? 'aus' : eu.has(code) ? 'eur' : 'other';\nconst rows = $input.all().map(item => { const row = item.json; const regionCode = region(String(row.countryId || '').toUpperCase()); const rawKey = String(row.sessionDefaultChannelGroup || '(not set)').slice(0,1010); const label = String(row.sessionDefaultChannelGroup || rawKey || '(not set)').slice(0,1024); return { day:isoDay(row.date), dimension_key:regionCode + ':' + rawKey, dimension_label:label, region_code:regionCode, ...metric(row) }; });\nreturn [{ json:{ ...window, dimensionType:'channel_group', rows } }];"
+      },
+      "id": "normalize-channel_group",
+      "name": "Normalize GA4 | channel_group",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/rpc/fb_ga4_replace_dimensions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            },
+            {
+              "name": "User-Agent",
+              "value": "FlavourBlasterDashboard-n8n/1.0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ p_property_id:298253309, p_start:$json.start, p_end:$json.end, p_dimension_type:'channel_group', p_rows:$json.rows }) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "supabase-upsert-channel_group",
+      "name": "Supabase Upsert GA4 channel_group [CREDENTIAL REQUIRED]",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1280,
+        140
+      ],
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "report",
+        "operation": "get",
+        "propertyType": "ga4",
+        "propertyId": {
+          "mode": "id",
+          "value": "298253309"
+        },
+        "dateRange": "custom",
+        "startDate": "={{ $('Current GA4 Window').first().json.start + 'T00:00:00.000Z' }}",
+        "endDate": "={{ $('Current GA4 Window').first().json.end + 'T23:59:59.999Z' }}",
+        "metricsGA4": {
+          "metricValues": [
+            {
+              "listName": "sessions"
+            },
+            {
+              "listName": "engagedSessions"
+            },
+            {
+              "listName": "eventCount"
+            },
+            {
+              "listName": "addToCarts"
+            },
+            {
+              "listName": "checkouts"
+            },
+            {
+              "listName": "ecommercePurchases"
+            },
+            {
+              "listName": "purchaseRevenue"
+            }
+          ]
+        },
+        "dimensionsGA4": {
+          "dimensionValues": [
+            {
+              "listName": "date"
+            },
+            {
+              "listName": "countryId"
+            },
+            {
+              "listName": "sessionSourceMedium"
+            }
+          ]
+        },
+        "returnAll": true,
+        "simple": true,
+        "additionalFields": {
+          "currencyCode": "GBP",
+          "keepEmptyRows": true
+        }
+      },
+      "id": "ga4-report-source_medium",
+      "name": "GA4 Report | source_medium",
+      "type": "n8n-nodes-base.googleAnalytics",
+      "typeVersion": 2,
+      "position": [
+        1520,
+        140
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "googleAnalyticsOAuth2": {
+          "id": "FB_GA4_OAUTH_REQUIRED",
+          "name": "Flavour Blaster GA4 contact@ [REQUIRED]"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const window = $('Current GA4 Window').first().json;\nconst runAt = window.runStartedAt || new Date().toISOString();\nconst isoDay = value => { const s = String(value || ''); if (!/^\\d{8}$/.test(s)) throw new Error('GA4_DATE_INVALID:' + s); return s.slice(0,4) + '-' + s.slice(4,6) + '-' + s.slice(6,8); };\nconst num = value => { const n = Number(value); return Number.isFinite(n) ? n : 0; };\nconst metric = row => ({ sessions:Math.max(0, Math.round(num(row.sessions))), engaged_sessions:Math.max(0, Math.round(num(row.engagedSessions))), event_count:Math.max(0, Math.round(num(row.eventCount))), add_to_carts:Math.max(0, Math.round(num(row.addToCarts))), checkouts:Math.max(0, Math.round(num(row.checkouts))), ecommerce_purchases:Math.max(0, Math.round(num(row.ecommercePurchases))), purchase_revenue:num(row.purchaseRevenue), is_provisional:isoDay(row.date) === window.today, source_updated_at:runAt });\nconst eu = new Set(['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE']);\nconst region = code => code === 'US' ? 'us' : code === 'GB' ? 'gb' : code === 'AU' ? 'aus' : eu.has(code) ? 'eur' : 'other';\nconst rows = $input.all().map(item => { const row = item.json; const regionCode = region(String(row.countryId || '').toUpperCase()); const rawKey = String(row.sessionSourceMedium || '(not set)').slice(0,1010); const label = String(row.sessionSourceMedium || rawKey || '(not set)').slice(0,1024); return { day:isoDay(row.date), dimension_key:regionCode + ':' + rawKey, dimension_label:label, region_code:regionCode, ...metric(row) }; });\nreturn [{ json:{ ...window, dimensionType:'source_medium', rows } }];"
+      },
+      "id": "normalize-source_medium",
+      "name": "Normalize GA4 | source_medium",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/rpc/fb_ga4_replace_dimensions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            },
+            {
+              "name": "User-Agent",
+              "value": "FlavourBlasterDashboard-n8n/1.0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ p_property_id:298253309, p_start:$json.start, p_end:$json.end, p_dimension_type:'source_medium', p_rows:$json.rows }) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "supabase-upsert-source_medium",
+      "name": "Supabase Upsert GA4 source_medium [CREDENTIAL REQUIRED]",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2000,
+        140
+      ],
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "report",
+        "operation": "get",
+        "propertyType": "ga4",
+        "propertyId": {
+          "mode": "id",
+          "value": "298253309"
+        },
+        "dateRange": "custom",
+        "startDate": "={{ $('Current GA4 Window').first().json.start + 'T00:00:00.000Z' }}",
+        "endDate": "={{ $('Current GA4 Window').first().json.end + 'T23:59:59.999Z' }}",
+        "metricsGA4": {
+          "metricValues": [
+            {
+              "listName": "sessions"
+            },
+            {
+              "listName": "engagedSessions"
+            },
+            {
+              "listName": "eventCount"
+            },
+            {
+              "listName": "addToCarts"
+            },
+            {
+              "listName": "checkouts"
+            },
+            {
+              "listName": "ecommercePurchases"
+            },
+            {
+              "listName": "purchaseRevenue"
+            }
+          ]
+        },
+        "dimensionsGA4": {
+          "dimensionValues": [
+            {
+              "listName": "date"
+            },
+            {
+              "listName": "countryId"
+            },
+            {
+              "listName": "country"
+            }
+          ]
+        },
+        "returnAll": true,
+        "simple": true,
+        "additionalFields": {
+          "currencyCode": "GBP",
+          "keepEmptyRows": true
+        }
+      },
+      "id": "ga4-report-country",
+      "name": "GA4 Report | country",
+      "type": "n8n-nodes-base.googleAnalytics",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        140
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "googleAnalyticsOAuth2": {
+          "id": "FB_GA4_OAUTH_REQUIRED",
+          "name": "Flavour Blaster GA4 contact@ [REQUIRED]"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const window = $('Current GA4 Window').first().json;\nconst runAt = window.runStartedAt || new Date().toISOString();\nconst isoDay = value => { const s = String(value || ''); if (!/^\\d{8}$/.test(s)) throw new Error('GA4_DATE_INVALID:' + s); return s.slice(0,4) + '-' + s.slice(4,6) + '-' + s.slice(6,8); };\nconst num = value => { const n = Number(value); return Number.isFinite(n) ? n : 0; };\nconst metric = row => ({ sessions:Math.max(0, Math.round(num(row.sessions))), engaged_sessions:Math.max(0, Math.round(num(row.engagedSessions))), event_count:Math.max(0, Math.round(num(row.eventCount))), add_to_carts:Math.max(0, Math.round(num(row.addToCarts))), checkouts:Math.max(0, Math.round(num(row.checkouts))), ecommerce_purchases:Math.max(0, Math.round(num(row.ecommercePurchases))), purchase_revenue:num(row.purchaseRevenue), is_provisional:isoDay(row.date) === window.today, source_updated_at:runAt });\nconst eu = new Set(['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE']);\nconst region = code => code === 'US' ? 'us' : code === 'GB' ? 'gb' : code === 'AU' ? 'aus' : eu.has(code) ? 'eur' : 'other';\nconst rows = $input.all().map(item => { const row = item.json; const regionCode = region(String(row.countryId || '').toUpperCase()); const rawKey = String(row.countryId || '(not set)').slice(0,1010); const label = String(row.country || rawKey || '(not set)').slice(0,1024); return { day:isoDay(row.date), dimension_key:regionCode + ':' + rawKey, dimension_label:label, region_code:regionCode, ...metric(row) }; });\nreturn [{ json:{ ...window, dimensionType:'country', rows } }];"
+      },
+      "id": "normalize-country",
+      "name": "Normalize GA4 | country",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2480,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/rpc/fb_ga4_replace_dimensions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            },
+            {
+              "name": "User-Agent",
+              "value": "FlavourBlasterDashboard-n8n/1.0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ p_property_id:298253309, p_start:$json.start, p_end:$json.end, p_dimension_type:'country', p_rows:$json.rows }) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "supabase-upsert-country",
+      "name": "Supabase Upsert GA4 country [CREDENTIAL REQUIRED]",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2720,
+        140
+      ],
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "report",
+        "operation": "get",
+        "propertyType": "ga4",
+        "propertyId": {
+          "mode": "id",
+          "value": "298253309"
+        },
+        "dateRange": "custom",
+        "startDate": "={{ $('Current GA4 Window').first().json.start + 'T00:00:00.000Z' }}",
+        "endDate": "={{ $('Current GA4 Window').first().json.end + 'T23:59:59.999Z' }}",
+        "metricsGA4": {
+          "metricValues": [
+            {
+              "listName": "sessions"
+            },
+            {
+              "listName": "engagedSessions"
+            },
+            {
+              "listName": "eventCount"
+            },
+            {
+              "listName": "addToCarts"
+            },
+            {
+              "listName": "checkouts"
+            },
+            {
+              "listName": "ecommercePurchases"
+            },
+            {
+              "listName": "purchaseRevenue"
+            }
+          ]
+        },
+        "dimensionsGA4": {
+          "dimensionValues": [
+            {
+              "listName": "date"
+            },
+            {
+              "listName": "countryId"
+            },
+            {
+              "listName": "deviceCategory"
+            }
+          ]
+        },
+        "returnAll": true,
+        "simple": true,
+        "additionalFields": {
+          "currencyCode": "GBP",
+          "keepEmptyRows": true
+        }
+      },
+      "id": "ga4-report-device",
+      "name": "GA4 Report | device",
+      "type": "n8n-nodes-base.googleAnalytics",
+      "typeVersion": 2,
+      "position": [
+        2960,
+        140
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "googleAnalyticsOAuth2": {
+          "id": "FB_GA4_OAUTH_REQUIRED",
+          "name": "Flavour Blaster GA4 contact@ [REQUIRED]"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const window = $('Current GA4 Window').first().json;\nconst runAt = window.runStartedAt || new Date().toISOString();\nconst isoDay = value => { const s = String(value || ''); if (!/^\\d{8}$/.test(s)) throw new Error('GA4_DATE_INVALID:' + s); return s.slice(0,4) + '-' + s.slice(4,6) + '-' + s.slice(6,8); };\nconst num = value => { const n = Number(value); return Number.isFinite(n) ? n : 0; };\nconst metric = row => ({ sessions:Math.max(0, Math.round(num(row.sessions))), engaged_sessions:Math.max(0, Math.round(num(row.engagedSessions))), event_count:Math.max(0, Math.round(num(row.eventCount))), add_to_carts:Math.max(0, Math.round(num(row.addToCarts))), checkouts:Math.max(0, Math.round(num(row.checkouts))), ecommerce_purchases:Math.max(0, Math.round(num(row.ecommercePurchases))), purchase_revenue:num(row.purchaseRevenue), is_provisional:isoDay(row.date) === window.today, source_updated_at:runAt });\nconst eu = new Set(['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE']);\nconst region = code => code === 'US' ? 'us' : code === 'GB' ? 'gb' : code === 'AU' ? 'aus' : eu.has(code) ? 'eur' : 'other';\nconst rows = $input.all().map(item => { const row = item.json; const regionCode = region(String(row.countryId || '').toUpperCase()); const rawKey = String(row.deviceCategory || '(not set)').slice(0,1010); const label = String(row.deviceCategory || rawKey || '(not set)').slice(0,1024); return { day:isoDay(row.date), dimension_key:regionCode + ':' + rawKey, dimension_label:label, region_code:regionCode, ...metric(row) }; });\nreturn [{ json:{ ...window, dimensionType:'device', rows } }];"
+      },
+      "id": "normalize-device",
+      "name": "Normalize GA4 | device",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3200,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/rpc/fb_ga4_replace_dimensions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            },
+            {
+              "name": "User-Agent",
+              "value": "FlavourBlasterDashboard-n8n/1.0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ p_property_id:298253309, p_start:$json.start, p_end:$json.end, p_dimension_type:'device', p_rows:$json.rows }) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "supabase-upsert-device",
+      "name": "Supabase Upsert GA4 device [CREDENTIAL REQUIRED]",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3440,
+        140
+      ],
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "report",
+        "operation": "get",
+        "propertyType": "ga4",
+        "propertyId": {
+          "mode": "id",
+          "value": "298253309"
+        },
+        "dateRange": "custom",
+        "startDate": "={{ $('Current GA4 Window').first().json.start + 'T00:00:00.000Z' }}",
+        "endDate": "={{ $('Current GA4 Window').first().json.end + 'T23:59:59.999Z' }}",
+        "metricsGA4": {
+          "metricValues": [
+            {
+              "listName": "sessions"
+            },
+            {
+              "listName": "engagedSessions"
+            },
+            {
+              "listName": "eventCount"
+            },
+            {
+              "listName": "addToCarts"
+            },
+            {
+              "listName": "checkouts"
+            },
+            {
+              "listName": "ecommercePurchases"
+            },
+            {
+              "listName": "purchaseRevenue"
+            }
+          ]
+        },
+        "dimensionsGA4": {
+          "dimensionValues": [
+            {
+              "listName": "date"
+            },
+            {
+              "listName": "countryId"
+            },
+            {
+              "listName": "landingPage"
+            }
+          ]
+        },
+        "returnAll": true,
+        "simple": true,
+        "additionalFields": {
+          "currencyCode": "GBP",
+          "keepEmptyRows": true
+        }
+      },
+      "id": "ga4-report-landing_page",
+      "name": "GA4 Report | landing_page",
+      "type": "n8n-nodes-base.googleAnalytics",
+      "typeVersion": 2,
+      "position": [
+        3680,
+        140
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "googleAnalyticsOAuth2": {
+          "id": "FB_GA4_OAUTH_REQUIRED",
+          "name": "Flavour Blaster GA4 contact@ [REQUIRED]"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const window = $('Current GA4 Window').first().json;\nconst runAt = window.runStartedAt || new Date().toISOString();\nconst isoDay = value => { const s = String(value || ''); if (!/^\\d{8}$/.test(s)) throw new Error('GA4_DATE_INVALID:' + s); return s.slice(0,4) + '-' + s.slice(4,6) + '-' + s.slice(6,8); };\nconst num = value => { const n = Number(value); return Number.isFinite(n) ? n : 0; };\nconst metric = row => ({ sessions:Math.max(0, Math.round(num(row.sessions))), engaged_sessions:Math.max(0, Math.round(num(row.engagedSessions))), event_count:Math.max(0, Math.round(num(row.eventCount))), add_to_carts:Math.max(0, Math.round(num(row.addToCarts))), checkouts:Math.max(0, Math.round(num(row.checkouts))), ecommerce_purchases:Math.max(0, Math.round(num(row.ecommercePurchases))), purchase_revenue:num(row.purchaseRevenue), is_provisional:isoDay(row.date) === window.today, source_updated_at:runAt });\nconst eu = new Set(['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE']);\nconst region = code => code === 'US' ? 'us' : code === 'GB' ? 'gb' : code === 'AU' ? 'aus' : eu.has(code) ? 'eur' : 'other';\nconst rows = $input.all().map(item => { const row = item.json; const regionCode = region(String(row.countryId || '').toUpperCase()); const rawKey = String(row.landingPage || '(not set)').slice(0,1010); const label = String(row.landingPage || rawKey || '(not set)').slice(0,1024); return { day:isoDay(row.date), dimension_key:regionCode + ':' + rawKey, dimension_label:label, region_code:regionCode, ...metric(row) }; });\nreturn [{ json:{ ...window, dimensionType:'landing_page', rows } }];"
+      },
+      "id": "normalize-landing_page",
+      "name": "Normalize GA4 | landing_page",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3920,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/rpc/fb_ga4_replace_dimensions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            },
+            {
+              "name": "User-Agent",
+              "value": "FlavourBlasterDashboard-n8n/1.0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ p_property_id:298253309, p_start:$json.start, p_end:$json.end, p_dimension_type:'landing_page', p_rows:$json.rows }) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "supabase-upsert-landing_page",
+      "name": "Supabase Upsert GA4 landing_page [CREDENTIAL REQUIRED]",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4160,
+        140
+      ],
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_sync_state?on_conflict=source_key",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=minimal"
+            },
+            {
+              "name": "User-Agent",
+              "value": "FlavourBlasterDashboard-n8n/1.0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ source_key:'ga4_traffic', cursor_updated_at:$('Current GA4 Window').first().json.end + 'T23:59:59.999Z', last_success_at:new Date().toISOString(), metadata:{ property_id:298253309, schedule_hours:6, schedule_timezone:'Europe/London', overlap_days:3, currency_code:'GBP', aggregate_only:true, provisional_through:$('Current GA4 Window').first().json.today } }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "ga4_traffic-checkpoint",
+      "name": "Supabase Upsert GA4 Success Checkpoint [CREDENTIAL REQUIRED]",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4400,
+        140
+      ],
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule - Every 6 Hours at :20 (London)": {
+      "main": [
+        [
+          {
+            "node": "Closed Development Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Test Trigger": {
+      "main": [
+        [
+          {
+            "node": "Closed Development Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Closed Development Gate": {
+      "main": [
+        [
+          {
+            "node": "Current GA4 Window",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Current GA4 Window": {
+      "main": [
+        [
+          {
+            "node": "GA4 Report | daily",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GA4 Report | daily": {
+      "main": [
+        [
+          {
+            "node": "Normalize GA4 | daily",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize GA4 | daily": {
+      "main": [
+        [
+          {
+            "node": "Supabase Upsert GA4 daily [CREDENTIAL REQUIRED]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Upsert GA4 daily [CREDENTIAL REQUIRED]": {
+      "main": [
+        [
+          {
+            "node": "GA4 Report | channel_group",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GA4 Report | channel_group": {
+      "main": [
+        [
+          {
+            "node": "Normalize GA4 | channel_group",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize GA4 | channel_group": {
+      "main": [
+        [
+          {
+            "node": "Supabase Upsert GA4 channel_group [CREDENTIAL REQUIRED]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Upsert GA4 channel_group [CREDENTIAL REQUIRED]": {
+      "main": [
+        [
+          {
+            "node": "GA4 Report | source_medium",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GA4 Report | source_medium": {
+      "main": [
+        [
+          {
+            "node": "Normalize GA4 | source_medium",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize GA4 | source_medium": {
+      "main": [
+        [
+          {
+            "node": "Supabase Upsert GA4 source_medium [CREDENTIAL REQUIRED]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Upsert GA4 source_medium [CREDENTIAL REQUIRED]": {
+      "main": [
+        [
+          {
+            "node": "GA4 Report | country",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GA4 Report | country": {
+      "main": [
+        [
+          {
+            "node": "Normalize GA4 | country",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize GA4 | country": {
+      "main": [
+        [
+          {
+            "node": "Supabase Upsert GA4 country [CREDENTIAL REQUIRED]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Upsert GA4 country [CREDENTIAL REQUIRED]": {
+      "main": [
+        [
+          {
+            "node": "GA4 Report | device",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GA4 Report | device": {
+      "main": [
+        [
+          {
+            "node": "Normalize GA4 | device",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize GA4 | device": {
+      "main": [
+        [
+          {
+            "node": "Supabase Upsert GA4 device [CREDENTIAL REQUIRED]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Upsert GA4 device [CREDENTIAL REQUIRED]": {
+      "main": [
+        [
+          {
+            "node": "GA4 Report | landing_page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GA4 Report | landing_page": {
+      "main": [
+        [
+          {
+            "node": "Normalize GA4 | landing_page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize GA4 | landing_page": {
+      "main": [
+        [
+          {
+            "node": "Supabase Upsert GA4 landing_page [CREDENTIAL REQUIRED]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Upsert GA4 landing_page [CREDENTIAL REQUIRED]": {
+      "main": [
+        [
+          {
+            "node": "Supabase Upsert GA4 Success Checkpoint [CREDENTIAL REQUIRED]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/London",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "propertyId": "298253309",
+    "measurementId": "G-M13HXTD6NW",
+    "scheduleHours": 6,
+    "scheduleMinute": 20,
+    "overlapDays": 3,
+    "aggregateOnly": true
+  },
+  "pinData": {},
+  "versionId": "fb-ga4-incremental-disabled-v1",
+  "tags": []
+}

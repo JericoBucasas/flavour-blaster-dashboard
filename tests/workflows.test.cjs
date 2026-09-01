@@ -9,15 +9,47 @@ const workflowDir = path.join(__dirname, '..', 'workflows', 'n8n');
 const files = fs.readdirSync(workflowDir).filter((name) => name.endsWith('.json'));
 
 test('all committed n8n workflows are disabled behind a closed gate', () => {
-  assert.equal(files.length, 4);
+  assert.equal(files.length, 6);
   for (const file of files) {
     const workflow = JSON.parse(fs.readFileSync(path.join(workflowDir, file), 'utf8'));
     assert.equal(workflow.active, false, file);
-    assert.match(workflow.name, /\[DISABLED\]$/, file);
+    assert.match(workflow.name, /DISABLED\]$/, file);
     const gate = workflow.nodes.find((node) => node.name === 'Closed Development Gate');
     assert.ok(gate, file);
     assert.match(gate.parameters.jsCode, /DEVELOPMENT_GATE = false/, file);
   }
+});
+
+test('GA4 workflows use the verified property, regional grains, bounded windows, and success-only checkpoints', () => {
+  const incremental = JSON.parse(fs.readFileSync(path.join(workflowDir, 'fb-dashboard-ga4-traffic-incremental.disabled.json'), 'utf8'));
+  const backfill = JSON.parse(fs.readFileSync(path.join(workflowDir, 'fb-dashboard-ga4-historical-backfill.disabled.json'), 'utf8'));
+  assert.equal(incremental.settings.timezone, 'Europe/London');
+  assert.match(JSON.stringify(incremental.nodes.find((node) => node.name.startsWith('Schedule - ')).parameters), /0 20 \*\/6 \* \* \*/);
+  assert.equal(incremental.meta.propertyId, '298253309');
+  assert.equal(incremental.meta.overlapDays, 3);
+  assert.equal(backfill.meta.historicalFloor, '2025-01-01');
+  assert.equal(backfill.nodes.some((node) => node.type === 'n8n-nodes-base.scheduleTrigger'), false);
+  for (const workflow of [incremental, backfill]) {
+    const reports = workflow.nodes.filter((node) => node.name.startsWith('GA4 Report |'));
+    assert.equal(reports.length, 6);
+    for (const report of reports) {
+      assert.equal(report.parameters.propertyId.value, '298253309');
+      assert.equal(report.credentials.googleAnalyticsOAuth2.id, 'FB_GA4_OAUTH_REQUIRED');
+      assert.deepEqual(report.parameters.metricsGA4.metricValues.map((item) => item.listName), ['sessions','engagedSessions','eventCount','addToCarts','checkouts','ecommercePurchases','purchaseRevenue']);
+      if (!report.name.endsWith('daily')) assert.ok(report.parameters.dimensionsGA4.dimensionValues.some((item) => item.listName === 'countryId'));
+    }
+    const normalizers = workflow.nodes.filter((node) => node.name.startsWith('Normalize GA4 |') && !node.name.endsWith('daily'));
+    for (const normalizer of normalizers) {
+      assert.match(normalizer.parameters.jsCode, /region_code:regionCode/);
+      assert.match(normalizer.parameters.jsCode, /regionCode \+ ':' \+ rawKey/);
+    }
+    const writes = workflow.nodes.filter((node) => node.name.startsWith('Supabase Upsert GA4') && !node.name.includes('Success Checkpoint'));
+    assert.equal(writes.length, 6);
+    assert.ok(writes.every((node) => node.credentials.httpCustomAuth.id === 'FB_SUPABASE_CUSTOM_REQUIRED'));
+  }
+  const checkpoint = incremental.nodes.find((node) => node.name === 'Supabase Upsert GA4 Success Checkpoint [CREDENTIAL REQUIRED]');
+  const checkpointParents = Object.entries(incremental.connections).filter(([, outputs]) => JSON.stringify(outputs).includes(checkpoint.name)).map(([name]) => name);
+  assert.deepEqual(checkpointParents, ['Supabase Upsert GA4 landing_page [CREDENTIAL REQUIRED]']);
 });
 
 test('Shopify writes are impossible without the unresolved Supabase server credential', () => {
@@ -172,4 +204,7 @@ test('health workflow queries only columns present in the approved sync-state sc
   assert.match(read.parameters.url, /source_key/);
   assert.match(read.parameters.url, /last_success_at/);
   assert.doesNotMatch(read.parameters.url, /workflow_key|last_attempt_at|last_error/);
+  const evaluate = workflow.nodes.find((node) => node.name === 'Evaluate Source Freshness');
+  assert.match(evaluate.parameters.jsCode, /ga4_traffic/);
+  assert.match(evaluate.parameters.jsCode, /ga4_traffic', maxAgeMs: 12 \* 60 \* 60 \* 1000/);
 });

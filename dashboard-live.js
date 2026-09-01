@@ -119,18 +119,20 @@
   function mergePayloads(parts, start, end) {
     var merged = {};
     var arrayKeys = ['daily', 'hourly', 'products', 'recentOrders'];
+    var trafficParts = [];
     var reconciliations = [];
     var coverageStarts = [];
     var coverageEnds = [];
     parts.forEach(function (part) {
       Object.keys(part || {}).forEach(function (key) {
-        if (arrayKeys.indexOf(key) >= 0 || key === 'shopifyReconciliation') return;
+        if (arrayKeys.indexOf(key) >= 0 || key === 'shopifyReconciliation' || key === 'traffic') return;
         merged[key] = part[key];
       });
       arrayKeys.forEach(function (key) {
         if (Array.isArray(part && part[key])) merged[key] = (merged[key] || []).concat(part[key]);
       });
       if (part && part.shopifyReconciliation) reconciliations.push(part.shopifyReconciliation);
+      if (part && part.traffic) trafficParts.push(part.traffic);
       if (part && part.coverageStart) coverageStarts.push(part.coverageStart);
       if (part && part.coverageEnd) coverageEnds.push(part.coverageEnd);
     });
@@ -173,6 +175,39 @@
         status:issue ? issue.status : latest.status,
         missingInitialOrders:reconciliations.reduce(function (sum, item) { return sum + number(item.missingInitialOrders); }, 0),
       });
+    }
+    if (trafficParts.length) {
+      var traffic = {
+        status:'live', propertyId:298253309, coverageStart:null, coverageEnd:null,
+        lastSuccessAt:null, provisionalThrough:null, daily:[], channelGroups:[],
+        sourceMedium:[], countries:[], devices:[], landingPages:[],
+      };
+      var trafficArrays = ['daily', 'channelGroups', 'sourceMedium', 'countries', 'devices', 'landingPages'];
+      var trafficStatusRank = { live:0, stale:1, unavailable:2 };
+      trafficParts.forEach(function (part) {
+        if ((trafficStatusRank[part.status] || 0) > (trafficStatusRank[traffic.status] || 0)) traffic.status = part.status;
+        if (part.code) traffic.code = part.code;
+        if (part.propertyId) traffic.propertyId = part.propertyId;
+        if (part.coverageStart && (!traffic.coverageStart || part.coverageStart < traffic.coverageStart)) traffic.coverageStart = part.coverageStart;
+        if (part.coverageEnd && (!traffic.coverageEnd || part.coverageEnd > traffic.coverageEnd)) traffic.coverageEnd = part.coverageEnd;
+        if (part.lastSuccessAt && (!traffic.lastSuccessAt || part.lastSuccessAt > traffic.lastSuccessAt)) traffic.lastSuccessAt = part.lastSuccessAt;
+        if (part.provisionalThrough && (!traffic.provisionalThrough || part.provisionalThrough > traffic.provisionalThrough)) traffic.provisionalThrough = part.provisionalThrough;
+        if (part.generatedAt && (!traffic.generatedAt || part.generatedAt > traffic.generatedAt)) traffic.generatedAt = part.generatedAt;
+        trafficArrays.forEach(function (key) {
+          if (Array.isArray(part[key])) traffic[key] = traffic[key].concat(part[key]);
+        });
+      });
+      trafficArrays.forEach(function (key) {
+        var seen = new Map();
+        traffic[key].forEach(function (row) {
+          var rowKey = key === 'daily' ? String(row.day) : [row.day, row.key, row.regionCode || ''].join('|');
+          seen.set(rowKey, row);
+        });
+        traffic[key] = Array.from(seen.values()).sort(function (a, b) {
+          return String(a.day || '').localeCompare(String(b.day || '')) || number(b.sessions) - number(a.sessions);
+        });
+      });
+      merged.traffic = traffic;
     }
     if (coverageStarts.length) merged.coverageStart = coverageStarts.sort()[0];
     if (coverageEnds.length) merged.coverageEnd = coverageEnds.sort().slice(-1)[0];

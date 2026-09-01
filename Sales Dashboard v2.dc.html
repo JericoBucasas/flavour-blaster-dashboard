@@ -290,7 +290,7 @@
       <sc-for list="{{ flags }}" as="f" hint-placeholder-count="3">
         <div onClick="{{ f.go }}" style="display:flex;gap:9px;align-items:flex-start;font-size:12.5px;line-height:1.35;cursor:pointer;padding:5px 7px;margin:-3px -7px;border-radius:var(--radius-md)" style-hover="background:var(--color-neutral-200)"><i class="ph-duotone {{ f.icon }}" style="font-size:16px;color:{{ f.col }};flex:none;margin-top:1px"></i><span>{{ f.text }}</span></div>
       </sc-for>
-      <div class="m-hide" style="font-size:11px;opacity:0.45;margin-top:12px">Keys: 1&ndash;7 views &middot; C compare &middot; / search</div>
+      <div class="m-hide" style="font-size:11px;opacity:0.45;margin-top:12px">Keys: 1&ndash;8 views &middot; C compare &middot; / search</div>
     </div>
   </aside>
 
@@ -560,7 +560,28 @@
               <svg viewBox="0 0 120 34" preserveAspectRatio="none" style="width:78px;height:26px;display:block;position:absolute;top:13px;right:14px;overflow:visible"><path d="{{ k.spark2 }}" fill="none" stroke="#bab6b6" stroke-width="1.3" stroke-dasharray="3 4" vector-effect="non-scaling-stroke"></path><path d="{{ k.spark }}" fill="none" stroke="{{ k.scol }}" stroke-width="1.6" vector-effect="non-scaling-stroke"></path></svg>
             </div>
           </sc-for>
-        </div><div class="sd-card" style="margin-top:16px">
+        </div>
+        <sc-if value="{{ trafficAvailable }}" hint-placeholder-val="false">
+          <div class="sd-card" style="margin-top:16px">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
+              <div><div class="sd-card-h">Website ecommerce funnel &middot; GA4</div><div style="font-size:12px;opacity:0.62;margin-top:4px">Observed website events for the selected date and region filters</div></div>
+              <div style="font-size:11.5px;color:{{ trafficStatusColor }};font-weight:600;text-align:right">{{ trafficStatusLabel }}</div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-top:18px">
+              <sc-for list="{{ trafficFunnel }}" as="step" hint-placeholder-count="4">
+                <div style="min-width:0">
+                  <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><span style="font-size:12px;opacity:.7">{{ step.label }}</span><strong style="font-size:15px;font-variant-numeric:tabular-nums">{{ step.value }}</strong></div>
+                  <div style="height:7px;background:var(--color-neutral-200);border-radius:4px;margin-top:9px;overflow:hidden"><div style="height:100%;width:{{ step.width }};background:var(--color-accent-500);border-radius:4px"></div></div>
+                  <div style="font-size:11.5px;opacity:.58;margin-top:7px">{{ step.stepRate }} step rate &middot; {{ step.overallRate }} overall</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ trafficUnavailable }}" hint-placeholder-val="true">
+          <div class="sd-card" style="margin-top:16px;display:flex;align-items:flex-start;gap:10px"><i class="ph-duotone ph-chart-line-down" style="font-size:19px;color:var(--color-accent-2-700);flex:none"></i><div><div style="font-size:13px;font-weight:650">{{ trafficStateTitle }}</div><div style="font-size:12px;line-height:1.5;opacity:.65;margin-top:3px">{{ trafficStateText }}</div></div></div>
+        </sc-if>
+        <div class="sd-card" style="margin-top:16px">
           <button type="button" onClick="{{ salesBreakdownToggle }}" aria-expanded="{{ salesBreakdownExpanded }}" aria-label="Toggle total sales breakdown" style="width:100%;min-height:44px;padding:0;border:0;background:transparent;color:inherit;display:flex;align-items:center;justify-content:space-between;gap:16px;text-align:left;cursor:pointer">
             <span style="min-width:0">
               <span class="sd-card-h" style="display:block">Total sales breakdown</span>
@@ -696,6 +717,42 @@
           </sc-for>
         </div>
       </div></section>
+    </sc-if>
+
+    <sc-if value="{{ isTraffic }}" hint-placeholder-val="{{ false }}">
+      <section id="sec-traffic" data-screen-label="Traffic" style="display:{{ sectionDisplay }}">
+        <sc-if value="{{ continuous }}" hint-placeholder-val="{{ false }}"><h2 style="font-size:16px;font-weight:650;margin:32px 0 0">Traffic</h2></sc-if>
+        <div class="sd-card" style="display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap">
+          <div><div class="sd-card-h">GA4 website analytics</div><div style="font-size:12.5px;line-height:1.5;opacity:.65;margin-top:4px">Property 298253309 &middot; Europe/London dates &middot; GBP &middot; Amazon traffic is not included</div></div>
+          <div style="font-size:12px;color:{{ trafficStatusColor }};font-weight:600;text-align:right">{{ trafficStatusLabel }}</div>
+        </div>
+        <sc-if value="{{ trafficUnavailable }}" hint-placeholder-val="{{ true }}">
+          <div class="sd-card" style="display:flex;align-items:flex-start;gap:11px"><i class="ph-duotone ph-cloud-slash" style="font-size:20px;color:var(--color-accent-2-700);flex:none"></i><div><div style="font-size:14px;font-weight:650">{{ trafficStateTitle }}</div><div style="font-size:12.5px;line-height:1.5;opacity:.68;margin-top:4px">{{ trafficStateText }}</div></div></div>
+        </sc-if>
+        <sc-if value="{{ trafficAvailable }}" hint-placeholder-val="{{ false }}">
+          <div class="sd-grid2 sd-kpis" style="display:grid;gap:12px;margin-top:16px">
+            <sc-for list="{{ trafficKpis }}" as="k" hint-placeholder-count="6"><div style="min-width:0"><div style="font-size:12.5px;opacity:.76">{{ k.label }}</div><div style="font-weight:650;font-size:17px;margin-top:8px;font-variant-numeric:tabular-nums">{{ k.val }}</div><div style="font-size:12px;margin-top:4px;min-height:17px;color:{{ k.dcol }};font-weight:600">{{ k.delta }}</div></div></sc-for>
+          </div>
+          <div class="sd-card" style="margin-top:16px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap"><div><div class="sd-card-h">Traffic trend</div><div style="font-size:12px;opacity:.6;margin-top:4px">{{ trafficTrendTitle }} over time</div></div><div style="display:flex;gap:2px;background:var(--color-neutral-200);border-radius:var(--radius-md);padding:2px;flex-wrap:wrap"><sc-for list="{{ trafficMetricOptions }}" as="opt" hint-placeholder-count="4"><button type="button" onClick="{{ opt.click }}" style="border:0;color:inherit;font:inherit;font-size:12px;padding:7px 10px;border-radius:var(--radius-sm);cursor:pointer;background:{{ opt.seg.bg }};font-weight:{{ opt.seg.wt }};box-shadow:{{ opt.seg.sh }}">{{ opt.label }}</button></sc-for></div></div>
+            <sc-for list="{{ chartTrafficL }}" as="chart" hint-placeholder-count="1"><div style="position:relative;margin-top:14px"><svg viewBox="-34 0 894 318" style="display:block;width:100%;height:auto" onMouseMove="{{ chart.move }}" onMouseLeave="{{ chart.leave }}"><sc-for list="{{ chart.grid }}" as="g"><line x1="0" x2="860" y1="{{ g.y }}" y2="{{ g.y }}" style="stroke:rgba(var(--lg-ink),0.08)"></line></sc-for><line x1="0" x2="860" y1="266" y2="266" style="stroke:rgba(var(--lg-ink),0.22)"></line><sc-if value="{{ chart.area }}" hint-placeholder-val="{{ false }}"><path d="{{ chart.area }}" style="fill:var(--lg-area)"></path></sc-if><sc-for list="{{ chart.series }}" as="s"><path d="{{ s.d }}" fill="none" stroke="{{ s.col }}" stroke-width="{{ s.w }}" stroke-dasharray="{{ s.dash }}" stroke-linecap="round" stroke-linejoin="round"></path></sc-for><sc-if value="{{ chart.hx }}" hint-placeholder-val="{{ false }}"><line x1="{{ chart.hx }}" x2="{{ chart.hx }}" y1="16" y2="266" style="stroke:rgba(var(--lg-ink),0.35)" stroke-dasharray="2 3"></line></sc-if><sc-for list="{{ chart.dots }}" as="dt"><circle cx="{{ dt.x }}" cy="{{ dt.y }}" r="3.5" fill="{{ dt.col }}" style="stroke:var(--color-bg)" stroke-width="1.5"></circle></sc-for></svg><sc-for list="{{ chart.grid }}" as="g"><div style="position:absolute;left:3.9%;top:{{ g.lty }};font-size:11px;opacity:.5;pointer-events:none;line-height:1">{{ g.label }}</div></sc-for><sc-for list="{{ chart.xTicks }}" as="xt"><div style="position:absolute;top:87.2%;left:{{ xt.lx }};transform:translateX(-50%);font-size:11px;opacity:.5;pointer-events:none;line-height:1;white-space:nowrap">{{ xt.label }}</div></sc-for><sc-if value="{{ chart.tip }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:8px;left:{{ chart.tip.left }};transform:translateX(-50%);background:var(--color-bg);box-shadow:var(--shadow-lg);padding:9px 13px;border-radius:var(--radius-lg);font-size:12.5px;white-space:nowrap;pointer-events:none;z-index:10"><div style="opacity:.6;margin-bottom:5px">{{ chart.tip.title }}</div><sc-for list="{{ chart.tip.rows }}" as="tr2"><div style="display:flex;align-items:center;gap:7px"><span style="width:8px;height:8px;border-radius:50%;background:{{ tr2.col }}"></span><span style="opacity:.7">{{ tr2.name }}</span><span style="margin-left:auto;font-weight:600;padding-left:14px">{{ tr2.val }}</span></div></sc-for></div></sc-if></div></sc-for>
+          </div>
+          <div class="sd-card"><div class="sd-card-h">Ecommerce funnel</div><div style="font-size:12px;opacity:.6;margin-top:4px">Step-to-step and overall conversion from GA4 tracked events</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px;margin-top:20px"><sc-for list="{{ trafficFunnel }}" as="step" hint-placeholder-count="4"><div><div style="display:flex;justify-content:space-between;gap:8px"><span style="font-size:12.5px;opacity:.7">{{ step.label }}</span><strong style="font-size:16px">{{ step.value }}</strong></div><div style="height:9px;background:var(--color-neutral-200);border-radius:5px;margin-top:10px;overflow:hidden"><div style="height:100%;width:{{ step.width }};background:var(--color-accent-500);border-radius:5px"></div></div><div style="font-size:11.5px;opacity:.58;margin-top:7px">{{ step.stepRate }} step &middot; {{ step.overallRate }} overall</div></div></sc-for></div></div>
+          <div class="sd-grid2" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px">
+            <div class="sd-card" style="margin:0"><div class="sd-card-h">Acquisition &middot; channel group</div><div style="margin-top:14px;display:flex;flex-direction:column;gap:12px"><sc-for list="{{ trafficChannelRows }}" as="r" hint-placeholder-count="8"><div><div style="display:flex;justify-content:space-between;gap:12px;font-size:12.5px"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.label }}</span><strong>{{ r.value }}</strong></div><div style="height:6px;background:var(--color-neutral-200);border-radius:3px;margin-top:6px"><div style="height:100%;width:{{ r.width }};background:var(--color-accent-500);border-radius:3px"></div></div><div style="font-size:11px;opacity:.55;margin-top:4px">{{ r.sub }}</div></div></sc-for></div></div>
+            <div class="sd-card" style="margin:0"><div class="sd-card-h">Acquisition &middot; source / medium</div><div style="margin-top:14px;display:flex;flex-direction:column;gap:12px"><sc-for list="{{ trafficSourceRows }}" as="r" hint-placeholder-count="8"><div><div style="display:flex;justify-content:space-between;gap:12px;font-size:12.5px"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.label }}</span><strong>{{ r.value }}</strong></div><div style="height:6px;background:var(--color-neutral-200);border-radius:3px;margin-top:6px"><div style="height:100%;width:{{ r.width }};background:var(--color-accent-500);border-radius:3px"></div></div><div style="font-size:11px;opacity:.55;margin-top:4px">{{ r.sub }}</div></div></sc-for></div></div>
+          </div>
+          <div class="sd-grid2" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px">
+            <div class="sd-card" style="margin:0"><div class="sd-card-h">Countries</div><div style="margin-top:14px;display:flex;flex-direction:column;gap:11px"><sc-for list="{{ trafficCountryRows }}" as="r" hint-placeholder-count="8"><div><div style="display:flex;justify-content:space-between;gap:12px;font-size:12.5px"><span>{{ r.label }}</span><strong>{{ r.value }}</strong></div><div style="height:5px;background:var(--color-neutral-200);border-radius:3px;margin-top:5px"><div style="height:100%;width:{{ r.width }};background:var(--color-accent-500);border-radius:3px"></div></div></div></sc-for></div></div>
+            <div class="sd-card" style="margin:0"><div class="sd-card-h">Devices</div><div style="margin-top:14px;display:flex;flex-direction:column;gap:11px"><sc-for list="{{ trafficDeviceRows }}" as="r" hint-placeholder-count="6"><div><div style="display:flex;justify-content:space-between;gap:12px;font-size:12.5px"><span style="text-transform:capitalize">{{ r.label }}</span><strong>{{ r.value }}</strong></div><div style="height:5px;background:var(--color-neutral-200);border-radius:3px;margin-top:5px"><div style="height:100%;width:{{ r.width }};background:var(--color-accent-500);border-radius:3px"></div></div><div style="font-size:11px;opacity:.55;margin-top:4px">{{ r.sub }}</div></div></sc-for></div></div>
+          </div>
+          <div class="sd-card"><div class="sd-card-h">Landing pages</div><div style="font-size:12px;opacity:.6;margin-top:4px">Paths exclude query strings</div><div style="overflow-x:auto;margin-top:12px"><table class="table" style="width:100%;min-width:680px"><thead><tr><th style="width:42px">#</th><th>Landing page</th><th style="text-align:right">Sessions</th><th style="text-align:right">Engagement</th><th style="text-align:right">Purchases</th><th style="text-align:right">Tracked revenue</th></tr></thead><tbody><sc-for list="{{ trafficLandingRows }}" as="r" hint-placeholder-count="10"><tr><td style="opacity:.5">{{ r.rank }}</td><td style="max-width:360px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="{{ r.label }}">{{ r.label }}</td><td style="text-align:right">{{ r.sessions }}</td><td style="text-align:right">{{ r.engagement }}</td><td style="text-align:right">{{ r.purchases }}</td><td style="text-align:right">{{ r.revenue }}</td></tr></sc-for></tbody></table></div></div>
+          <div class="sd-grid2" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px">
+            <div class="sd-card" style="margin:0"><div class="sd-card-h">Engagement summary</div><div style="display:grid;grid-template-columns:1fr auto;gap:12px 18px;margin-top:16px;font-size:13px"><span style="opacity:.68">Sessions</span><strong>{{ trafficEngagement.sessions }}</strong><span style="opacity:.68">Engaged sessions</span><strong>{{ trafficEngagement.engaged }}</strong><span style="opacity:.68">Engagement rate</span><strong>{{ trafficEngagement.rate }}</strong><span style="opacity:.68">Events</span><strong>{{ trafficEngagement.events }}</strong><span style="opacity:.68">Events per session</span><strong>{{ trafficEngagement.eventsPerSession }}</strong></div></div>
+            <div class="sd-card" style="margin:0"><div class="sd-card-h">GA4 / Shopify reconciliation</div><div style="font-size:12px;opacity:.6;margin-top:4px">GA4 is diagnostic. Shopify remains authoritative for commerce.</div><div style="display:flex;flex-direction:column;margin-top:12px"><sc-for list="{{ trafficReconciliation }}" as="r" hint-placeholder-count="4"><div style="display:flex;justify-content:space-between;gap:18px;padding:10px 0;border-top:1px solid var(--sd-line)"><div><div style="font-size:12.5px">{{ r.label }}</div><div style="font-size:11px;opacity:.55;margin-top:2px">{{ r.note }}</div></div><strong style="font-size:13px;white-space:nowrap">{{ r.value }}</strong></div></sc-for></div></div>
+          </div>
+        </sc-if>
+      </section>
     </sc-if>
 
     <sc-if value="{{ isChannels }}" hint-placeholder-val="{{ false }}">
@@ -1312,7 +1369,7 @@
         </div><div class="sd-card"><div class="sd-card-h">Dashboard behavior</div>
         <div style="display:grid;grid-template-columns:minmax(130px,200px) minmax(0,1fr);gap:20px 26px;align-items:center">
           <div style="font-size:14.5px">Default view</div>
-          <select class="input" value="{{ defViewVal }}" onChange="{{ setDefView }}" style="max-width:180px"><option value="overview">Overview</option><option value="channels">Channels</option><option value="regions">Regions</option><option value="orders">Orders</option><option value="products">Products</option><option value="customers">Customers</option></select>
+          <select class="input" value="{{ defViewVal }}" onChange="{{ setDefView }}" style="max-width:180px"><option value="overview">Overview</option><option value="traffic">Traffic</option><option value="channels">Channels</option><option value="regions">Regions</option><option value="orders">Orders</option><option value="products">Products</option><option value="customers">Customers</option><option value="ads">Ads</option></select>
           <div style="font-size:14.5px">Default date range</div>
           <select class="input" value="{{ defRangeVal }}" onChange="{{ setDefRange }}" style="max-width:180px"><option value="today">Today</option><option value="yesterday">Yesterday</option><option value="last7">Last 7 days</option><option value="last30">Last 30 days</option><option value="last90">Last 90 days</option><option value="mtd">Month to date</option><option value="qtd">Quarter to date</option><option value="ytd">Year to date</option></select>
           <div style="font-size:14.5px">Default comparison</div>
@@ -1488,8 +1545,11 @@ class Component extends DCLogic {
     let [s, e] = this.presetRange(rk);
     let rangeKey = rk;
     if (hp.s && hp.e && isFinite(+hp.s) && isFinite(+hp.e)) { s = +hp.s; e = +hp.e; rangeKey = 'custom'; }
-    const VK = ['overview','channels','regions','orders','products','customers','settings'];
+    const VK = ['overview','traffic','channels','regions','orders','products','customers','ads','settings'];
     const CM = ['none','prev','py','pydow','custom'];
+    const KPI_KEYS = ['total','gross','net','orders','aov','sessions','ga4conv','shopifyconv','margin','disc','ret','adspend','adroas'];
+    const savedKpiOrder = (Array.isArray(ls.kpiOrder) ? ls.kpiOrder : []).map(k => k === 'conv' ? 'ga4conv' : k).filter((k, i, a) => KPI_KEYS.includes(k) && a.indexOf(k) === i);
+    const migratedKpiOrder = savedKpiOrder.concat(KPI_KEYS.filter(k => !savedKpiOrder.includes(k)));
     let cmpMode = CM.includes(hp.cm) ? hp.cm : (CM.includes(ls.defCmp) ? ls.defCmp : ((hp.cmp === '0' || (hp.cmp == null && !(p.compareOn ?? true))) ? 'none' : 'prev'));
     let cmpS = null, cmpE = null;
     if (cmpMode === 'custom') { if (hp.cs && isFinite(+hp.cs) && isFinite(+hp.ce)) { cmpS = +hp.cs; cmpE = +hp.ce; } else cmpMode = 'prev'; }
@@ -1499,7 +1559,7 @@ class Component extends DCLogic {
       theme:(hp.t && this.THEMES.some(t => t[0] === hp.t)) ? hp.t : (hp.d === '1' ? 'ink' : (ls.theme && this.THEMES.some(t => t[0] === ls.theme) ? ls.theme : 'paper')),
       accent:'custom',
       accentHex:(hp.ah && /^[0-9a-fA-F]{6}$/.test(hp.ah)) ? '#' + hp.ah : (ls.brandV === 2 && ls.accentHex ? ls.accentHex : '#c9377e'),
-      hsv:null, accHexDraft:null, accPickOpen:false, searchQ:'', searchExp:false, selKpi:'total', salesBreakdownOpen:false, mobileKpisOpen:false, mobileMetricsOpen:false, mobileBriefOpen:false, mobileProductLimit:20, mobileDirectoryLimit:20, chartOn:{}, ordSort:null, prodSort:null, productStatus:'active', expandedProduct:null, prodColumnsOpen:false,
+      hsv:null, accHexDraft:null, accPickOpen:false, searchQ:'', searchExp:false, selKpi:'total', trafficMetric:'sessions', salesBreakdownOpen:false, mobileKpisOpen:false, mobileMetricsOpen:false, mobileBriefOpen:false, mobileProductLimit:20, mobileDirectoryLimit:20, chartOn:{}, ordSort:null, prodSort:null, productStatus:'active', expandedProduct:null, prodColumnsOpen:false,
       prodColOn:{ name:true, sku:false, status:true, vendor:false, tags:false, price:true, cost:false, gm:false, units:true, sales:false, stock:true, locations:false, updatedAt:false },
       directoryTab:'customers', directoryColumnsOpen:false, dirSort:null, expandedDirectory:null,
       dirColOn:{
@@ -1511,7 +1571,7 @@ class Component extends DCLogic {
       dataStatus:'loading', dataError:null, dataRequestKey:null, dataUpdatedAt:null, dataCoverageStart:null, dataCoverageEnd:null, dataBaseCurrency:null, shopifyReconciliation:null, livePayload:null,
       repCur:'GBP', fxAuto:ls.fxAuto ?? true, fxFetched:null, targetMode:ls.targetMode || 'growth', targetAbs:ls.targetAbs ?? null, chCfg:ls.chCfg || {}, rgCfg:ls.rgCfg || {},
       flagsOn:ls.flagsOn || {}, agingDays:ls.agingDays || 2, anomSens:ls.anomSens || 'med', density:ls.density || 'comfortable', contentW:[1200,1400,1600,2000].includes(ls.contentW) ? ls.contentW : 1200,
-      kpiOn:ls.kpiOn || {}, kpiOrder:ls.kpiOrder || null, defView:ls.defView || null, defRange:ls.defRange || null, defCmp:ls.defCmp || null,
+      kpiOn:{ ...(ls.kpiOn || {}), ...(Object.prototype.hasOwnProperty.call(ls.kpiOn || {}, 'conv') && !Object.prototype.hasOwnProperty.call(ls.kpiOn || {}, 'ga4conv') ? { ga4conv:ls.kpiOn.conv } : {}) }, kpiOrder:migratedKpiOrder, defView:ls.defView || null, defRange:ls.defRange || null, defCmp:ls.defCmp || null,
       chOn:Object.fromEntries(this.CH.map(c => [c.k, c.k === 'd2c' || c.k === 'b2b'])), rgOn:Object.fromEntries(this.RG.map(g => [g.k, true])) };
     this._n = 1;
     this.moveFor = (key2) => (ev) => {
@@ -1530,7 +1590,7 @@ class Component extends DCLogic {
     this.applyAccent();
     this._keys = (e) => {
       if (e.target && /input|textarea|select/i.test(e.target.tagName)) return;
-      const V = ['overview','channels','regions','orders','products','customers','ads'];
+      const V = ['overview','traffic','channels','regions','orders','products','customers','ads'];
       if (e.key === '/') { e.preventDefault(); this.setState({ searchExp:true }); setTimeout(() => { const el = document.querySelector('[data-lg-search]'); if (el) el.focus(); }, 60); return; }
       const i = '1234567'.indexOf(e.key);
       if (i >= 0) this.setState({ view:V[i], hi:null });
@@ -1577,7 +1637,8 @@ class Component extends DCLogic {
         payload = { ...payload, ...loadedPayload };
       }
       const normalized = window.FlavourBlasterLive.normalize(payload, this.CH, this.RG);
-      if (!normalized.hasLiveData) {
+      const hasGa4Data = Array.isArray(payload.traffic?.daily) && payload.traffic.daily.length > 0;
+      if (!normalized.hasLiveData && !hasGa4Data) {
         this.days = [];
         this.setState({ dataStatus:'empty', livePayload:payload, dataUpdatedAt:payload.sourceLastUpdatedAt || payload.generatedAt || null,
           dataCoverageStart:payload.coverageStart || null, dataCoverageEnd:payload.coverageEnd || null });
@@ -1800,6 +1861,45 @@ class Component extends DCLogic {
     for (const c of this.CH) this.finish(A.ch[c.k]);
     return this.finish(A);
   }
+  ga4Range(s, e) {
+    const traffic = this.state.livePayload?.traffic;
+    const blank = { ds:[], sessions:0, engagedSessions:0, eventCount:0, addToCarts:0, checkouts:0, ecommercePurchases:0, purchaseRevenue:0 };
+    if (!traffic || !Array.isArray(traffic.daily)) return blank;
+    const selectedRegions = new Set(this.RG.filter(g => this.state.rgOn[g.k]).map(g => g.k));
+    const allRegions = selectedRegions.size === this.RG.length;
+    const source = allRegions ? traffic.daily : (Array.isArray(traffic.countries) ? traffic.countries.filter(r => selectedRegions.has(r.regionCode)) : []);
+    const byDay = new Map();
+    const fields = ['sessions','engagedSessions','eventCount','addToCarts','checkouts','ecommercePurchases','purchaseRevenue'];
+    for (const row of source) {
+      const t = Date.parse(String(row.day || '') + 'T00:00:00Z');
+      if (!isFinite(t) || t < s || t > e) continue;
+      if (!byDay.has(t)) byDay.set(t, { t, day:String(row.day), isProvisional:false, sessions:0, engagedSessions:0, eventCount:0, addToCarts:0, checkouts:0, ecommercePurchases:0, purchaseRevenue:0 });
+      const day = byDay.get(t);
+      for (const field of fields) day[field] += Number(row[field]) || 0;
+      day.isProvisional = day.isProvisional || !!row.isProvisional;
+    }
+    const ds = [...byDay.values()].sort((a, b) => a.t - b.t);
+    const out = { ...blank, ds };
+    for (const day of ds) for (const field of fields) out[field] += day[field];
+    return out;
+  }
+  ga4Breakdown(rows, s, e) {
+    if (!Array.isArray(rows)) return [];
+    const selectedRegions = new Set(this.RG.filter(g => this.state.rgOn[g.k]).map(g => g.k));
+    const allRegions = selectedRegions.size === this.RG.length;
+    const fields = ['sessions','engagedSessions','eventCount','addToCarts','checkouts','ecommercePurchases','purchaseRevenue'];
+    const grouped = new Map();
+    for (const row of rows) {
+      const t = Date.parse(String(row.day || '') + 'T00:00:00Z');
+      if (!isFinite(t) || t < s || t > e) continue;
+      if (!allRegions && !selectedRegions.has(row.regionCode)) continue;
+      const label = String(row.label || row.key || '(not set)');
+      if (!grouped.has(label)) grouped.set(label, { label, sessions:0, engagedSessions:0, eventCount:0, addToCarts:0, checkouts:0, ecommercePurchases:0, purchaseRevenue:0 });
+      const item = grouped.get(label);
+      for (const field of fields) item[field] += Number(row[field]) || 0;
+    }
+    return [...grouped.values()].sort((a, b) => b.sessions - a.sessions || a.label.localeCompare(b.label));
+  }
   mkSeg(on) { return { bg:on ? 'var(--color-bg)' : 'transparent', wt:on ? '600' : '400', sh:on ? 'var(--shadow-sm)' : 'none' }; }
   fmtDate(t, yr) { const d = new Date(t); return this.MO[d.getUTCMonth()] + ' ' + d.getUTCDate() + (yr ? ', ' + d.getUTCFullYear() : ''); }
   rc() { const c = (this.state && this.state.repCur) || 'USD'; const base = (this.state && this.state.dataBaseCurrency) || 'USD'; const d = this.FX[c] || this.FX.USD; const b = this.FX[base] || this.FX.USD; return { r:d[0] / b[0], s:d[1] }; }
@@ -1850,7 +1950,6 @@ class Component extends DCLogic {
     if (isFinite(lo0) && lo0 > 0 && lo0 / hi0 > 0.45) { const span = (hi0 - lo0) || hi0 * 0.1; mn = Math.max(0, lo0 - span * 0.4); }
     const mx = mn > 0 ? hi0 + ((hi0 - mn) * 0.08 || hi0 * 0.05) : this.nice(Math.max(1e-9, hi0));
     const n = Math.max(...list.map(s => s.vals.length));
-    this._n = n;
     const X = i => n > 1 ? i / (n - 1) * W : W / 2;
     const Y = v => T + (H - T - B) * (1 - (v - mn) / (mx - mn));
     const series = list.map(s => ({ d:this.smooth(s.vals.map((v, i) => v == null ? null : [X(i), Y(v)]).filter(Boolean)), col:s.col, w:s.w || 2.4, dash:s.dash || 'none' }));
@@ -1874,7 +1973,8 @@ class Component extends DCLogic {
       tip = { left:((X(hi) + 34) / 894 * 100).toFixed(1) + '%', title:xLabels[hi], rows:list.filter(s => s.vals[hi] != null).map(s => ({ col:s.col, name:s.name, val:fmtTip(s.vals[hi]) })) };
     }
     const legend = list.filter(s => s.name).map(s => ({ name:s.name, col:s.col, ls:s.dash && s.dash !== 'none' ? 'dashed' : 'solid' }));
-    return { grid, xTicks, series, area:areaP, hx, dots, tip, legend, move:this.moveFor(key), leave:this._leave,
+    const move = (ev) => { const rect = ev.currentTarget.getBoundingClientRect(); const f = Math.max(0, Math.min(1, ((ev.clientX - rect.left) / rect.width * 894 - 34) / 860)); const index = Math.round(f * (n - 1)); if (index !== this.state.hi || this.state.hiV !== key) this.setState({ hi:index, hiV:key }); };
+    return { grid, xTicks, series, area:areaP, hx, dots, tip, legend, move, leave:this._leave,
       yTitle:(yTitle || '').toUpperCase(), xTitle:(xTitle || '').toUpperCase() };
   }
   resample(vals, n) {
@@ -1918,7 +2018,7 @@ class Component extends DCLogic {
     const retCeil = (st.retO ?? this.props.returnCeiling ?? 6) / 100;
 
     const VIEWS = [
-      ['overview','Overview','ph-gauge'],['channels','Channels','ph-storefront'],['regions','Regions','ph-globe-hemisphere-west'],
+      ['overview','Overview','ph-gauge'],['traffic','Traffic','ph-chart-line-up'],['channels','Channels','ph-storefront'],['regions','Regions','ph-globe-hemisphere-west'],
       ['orders','Orders','ph-receipt'],['products','Products','ph-package'],['customers','Customers','ph-users-three'],['ads','Ads','ph-megaphone'],
       ['settings','Settings','ph-gear-six'],
     ];
@@ -1983,6 +2083,41 @@ class Component extends DCLogic {
       bg:st.cmpMode === k ? 'var(--color-accent-100)' : 'transparent', col:st.cmpMode === k ? 'var(--color-accent-800)' : 'inherit',
       click:k === 'custom' ? () => this.setState({ cmpCustomOpen:true, cmpDraftS:null, cmpDraftE:null, cmpCalBase:cmpBase }) : () => this.setState({ cmpMode:k, compare:k !== 'none', cmpOpen:false, cmpCustomOpen:false, hi:null, ...(this.state.retSheet ? { filterSheet:true, retSheet:false } : {}) }) }));
 
+    const trafficPayload = st.livePayload?.traffic || null;
+    const gaCur = this.ga4Range(st.start, st.end), gaPrev = this.ga4Range(pS, pE);
+    const shopifySelected = !!(st.chOn.d2c || st.chOn.b2b);
+    const amazonSelected = !!(st.chOn.amzus || st.chOn.amzuk);
+    const amazonOnly = amazonSelected && !shopifySelected;
+    const trafficHasRows = gaCur.ds.length > 0;
+    const trafficAvailable = !amazonOnly && shopifySelected && trafficPayload && trafficPayload.status !== 'unavailable' && trafficHasRows;
+    const trafficStale = trafficAvailable && trafficPayload.status === 'stale';
+    const trafficProvisional = trafficAvailable && gaCur.ds.some(d => d.isProvisional);
+    const trafficUpdated = trafficPayload?.lastSuccessAt ? new Date(trafficPayload.lastSuccessAt).toLocaleString('en-GB', { dateStyle:'medium', timeStyle:'short', timeZone:'Europe/London' }) : 'not yet synchronized';
+    const trafficStateTitle = amazonOnly ? 'Website analytics are not applicable to Amazon-only channels.'
+      : !shopifySelected ? 'Select Shopify D2C or Shopify B2B to view website analytics.'
+      : !trafficPayload || trafficPayload.status === 'unavailable' ? 'GA4 website analytics are unavailable.'
+      : !trafficHasRows ? 'No GA4 data is available for this date and region selection.'
+      : '';
+    const trafficStateText = amazonOnly ? 'GA4 measures the Flavour Blaster website and does not track Amazon marketplace traffic.'
+      : !trafficPayload || trafficPayload.status === 'unavailable' ? 'The dashboard will not substitute sample figures. Check GA4 Sync Health and the last successful workflow run.'
+      : !trafficHasRows ? 'The selected range may be before GA4 coverage, outside the synchronized window, or contain no observed sessions.'
+      : '';
+    const gaConv = gaCur.sessions ? gaCur.ecommercePurchases / gaCur.sessions : 0;
+    const gaPrevConv = gaPrev.sessions ? gaPrev.ecommercePurchases / gaPrev.sessions : 0;
+    const shopifyWebOrders = (cur.ch.d2c?.o || 0) + (cur.ch.b2b?.o || 0);
+    const prevShopifyWebOrders = (prev.ch.d2c?.o || 0) + (prev.ch.b2b?.o || 0);
+    const shopifyWebConv = gaCur.sessions ? shopifyWebOrders / gaCur.sessions : 0;
+    const prevShopifyWebConv = gaPrev.sessions ? prevShopifyWebOrders / gaPrev.sessions : 0;
+    const canShowShopifyWebConv = trafficAvailable && !!st.chOn.d2c && !!st.chOn.b2b;
+    const gaSpark = (field, ratioFn) => {
+      const cv = gaCur.ds.map(d => ratioFn ? ratioFn(d) : d[field]);
+      const pv = st.compare && gaPrev.ds.length ? this.resample(gaPrev.ds.map(d => ratioFn ? ratioFn(d) : d[field]), cv.length) : null;
+      if (!cv.length) return { spark:'', spark2:'', scol:'var(--color-accent-300)' };
+      const all = pv ? cv.concat(pv) : cv, mn = Math.min(...all), mx = Math.max(...all);
+      return { spark:this.sparkPath(cv, mn, mx), spark2:pv ? this.sparkPath(pv, mn, mx) : '', scol:'var(--color-accent-300)' };
+    };
+    const gaUnavailableKpi = (k, label, note) => ({ k, label, val:'—', delta:note || trafficStateTitle, dcol:'inherit', spark:'', spark2:'', scol:'var(--color-accent-300)' });
+
     const cAov = cur.aovO ? cur.aovS / cur.aovO : 0, pAov = prev.aovO ? prev.aovS / prev.aovO : 0;
     const cConv = cur.v ? cur.o / cur.v : 0, pConv = prev.v ? prev.o / prev.v : 0;
     const liveProductMetrics = st.dataStatus === 'live' && Array.isArray(st.livePayload?.products) ? st.livePayload.products : [];
@@ -2003,14 +2138,19 @@ class Component extends DCLogic {
       { k:'net', label:'Net sales', val:this.money(cur.ns), ...this.delta(cur.ns, prev.ns), ...this.sparks(cur, prev, d => d.ns) },
       { k:'orders', label:'Orders', val:this.num(cur.o), ...this.delta(cur.o, prev.o), ...this.sparks(cur, prev, d => d.o) },
       { k:'aov', label:'Average order value', val:this.money2Aov(cAov), ...this.delta(cAov, pAov), ...this.sparks(cur, prev, d => d.aovO ? d.aovS / d.aovO : 0, null, true) },
-      st.dataStatus === 'live' ? { k:'conv', label:'Conversion rate', val:'—', delta:'Sessions not connected', dcol:'inherit', spark:'', spark2:'' } : { k:'conv', label:'Conversion rate', val:this.pct(cConv, 2), ...this.delta(cConv, pConv), ...this.sparks(cur, prev, d => d.v ? d.o / d.v : 0, null, true) },
+      trafficAvailable ? { k:'sessions', label:'Website sessions · GA4', val:this.num(gaCur.sessions), ...this.delta(gaCur.sessions, gaPrev.sessions), ...gaSpark('sessions') } : gaUnavailableKpi('sessions', 'Website sessions · GA4'),
+      trafficAvailable ? { k:'ga4conv', label:'GA4 purchase conversion', val:this.pct(gaConv, 2), ...this.delta(gaConv, gaPrevConv), ...gaSpark('ecommercePurchases', d => d.sessions ? d.ecommercePurchases / d.sessions : 0) } : gaUnavailableKpi('ga4conv', 'GA4 purchase conversion'),
+      canShowShopifyWebConv ? { k:'shopifyconv', label:'Shopify web order conversion', val:this.pct(shopifyWebConv, 2), ...this.delta(shopifyWebConv, prevShopifyWebConv), spark:'', spark2:'', scol:'var(--color-accent-300)' }
+        : gaUnavailableKpi('shopifyconv', 'Shopify web order conversion', trafficAvailable ? 'Select both Shopify D2C and B2B' : trafficStateTitle),
       st.dataStatus === 'live' && !liveCostAvailable ? { k:'margin', label:'Gross margin', val:'—', delta:'Product cost unavailable', dcol:'inherit', spark:'', spark2:'' } : { k:'margin', label:'Gross margin', val:this.pct(cMar), ...this.delta(cMar, pMar), ...this.sparks(cur, prev, d => d.ns ? d.gp / d.ns : 0, null, true) },
       { k:'disc', label:'Discount rate', val:this.pct(cDisc), ...this.delta(cDisc, pDisc, true), ...this.sparks(cur, prev, d => d.s ? d.dsc / d.s : 0, A2, true) },
       { k:'ret', label:'Return rate', val:this.pct(cRet), ...this.delta(cRet, pRet, true), ...this.sparks(cur, prev, d => d.u ? d.rfU / d.u : 0, A2, true) },
       st.dataStatus === 'live' ? { k:'adspend', label:'Ad spend', val:'—', delta:'Ads accounts not connected', dcol:'inherit', spark:'', spark2:'' } : { k:'adspend', label:'Ad spend', val:this.money(cur.s * 0.108), ...this.delta(cur.s * 0.108, prev.s * 0.108, true), ...this.sparks(cur, prev, d => d.s * 0.108, A2) },
       st.dataStatus === 'live' ? { k:'adroas', label:'MER (sales \u00f7 ad spend)', val:'—', delta:'Ads accounts not connected', dcol:'inherit', spark:'', spark2:'' } : { k:'adroas', label:'MER (sales \u00f7 ad spend)', val:(cur.s > 0 ? (1 / 0.108).toFixed(1) : '0.0') + '\u00d7', delta:'View Ads for ROAS detail', dcol:'inherit', ...this.sparks(cur, prev, d => d.s) },
     ];
-    const kpiOrd = (st.kpiOrder && st.kpiOrder.length === kpisAll.length) ? st.kpiOrder : kpisAll.map(x => x.k);
+    const kpiKeys = new Set(kpisAll.map(x => x.k));
+    const migratedOrder = (Array.isArray(st.kpiOrder) ? st.kpiOrder : []).map(k => k === 'conv' ? 'ga4conv' : k).filter((k, i, a) => kpiKeys.has(k) && a.indexOf(k) === i);
+    const kpiOrd = migratedOrder.concat(kpisAll.map(x => x.k).filter(k => !migratedOrder.includes(k)));
     this._kpiOrd = kpiOrd;
     const kpis = kpiOrd.map(k2 => kpisAll.find(x => x.k === k2)).filter(x => x && (st.kpiOn[x.k] ?? true))
       .map(x => ({ ...x, pick:() => this.setState({ selKpi:x.k, hi:null }), selSh:(st.selKpi || 'total') === x.k ? 'inset 0 0 0 2px var(--color-accent-500)' : 'none' }));
@@ -2060,18 +2200,39 @@ class Component extends DCLogic {
       net:['Net sales over time', d => d.ns, km, m2, true],
       orders:['Orders over time', d => d.o, kn, n2, true],
       aov:['Average order value over time', d => d.aovO ? d.aovS / d.aovO : 0, v => this.money(v), v => this.money2Aov(v), false],
-      conv:['Conversion rate over time', d => d.v ? d.o / d.v : 0, pf, pf2, false],
       margin:['Gross margin over time', d => d.ns ? d.gp / d.ns : 0, pf, pf, false],
       disc:['Discount rate over time', d => d.s ? d.dsc / d.s : 0, pf, pf, false],
       ret:['Return rate over time', d => d.u ? d.rfU / d.u : 0, pf, pf, false],
       adspend:['Ad spend over time', d => d.s * 0.108, km, m2, true],
       adroas:['Total sales over time', d => d.s, km, m2, true],
     };
-    const [ovTitle, ovFn, ovAx, ovTip, ovAreaOk] = MET[selKpi] || MET.gross;
-    const ovRatio = !ovAreaOk; // aov/conv/margin/disc/ret are ratio metrics
-    const sSel = this.rangeSeries(cur, ovFn, ovRatio);
-    let ovList = [{ name:'This period', col:ACCX, vals:sSel.vals, w:2.6 }], ovLabels = labels;
-    if (selKpi === 'gross' && st.end === this.NOW && cur.ds.length >= 7 && dayOfMonth < dim) {
+    const trafficMet = {
+      sessions:['Website sessions over time', d => d.sessions, kn, n2, true],
+      ga4conv:['GA4 purchase conversion over time', d => d.sessions ? d.ecommercePurchases / d.sessions : 0, pf, pf2, false],
+      shopifyconv:['Shopify web order conversion over time', null, pf, pf2, false],
+    };
+    const useTrafficChart = !!trafficMet[selKpi];
+    const [ovTitle, ovFn, ovAx, ovTip, ovAreaOk] = useTrafficChart ? trafficMet[selKpi] : (MET[selKpi] || MET.gross);
+    const ovRatio = !ovAreaOk;
+    let ovList, ovLabels, ovXAxis;
+    if (useTrafficChart) {
+      const commerceByDay = new Map(cur.ds.map(d => [d.t, (d.ch.d2c?.o || 0) + (d.ch.b2b?.o || 0)]));
+      const prevCommerceByDay = new Map(prev.ds.map(d => [d.t, (d.ch.d2c?.o || 0) + (d.ch.b2b?.o || 0)]));
+      const trafficValue = (d, map) => selKpi === 'shopifyconv' ? (d.sessions ? (map.get(d.t) || 0) / d.sessions : 0) : ovFn(d);
+      const currentValues = trafficAvailable && (selKpi !== 'shopifyconv' || canShowShopifyWebConv) ? gaCur.ds.map(d => trafficValue(d, commerceByDay)) : [];
+      const priorValues = gaPrev.ds.map(d => trafficValue(d, prevCommerceByDay));
+      ovLabels = gaCur.ds.map(d => this.fmtDate(d.t, false));
+      ovList = [{ name:'This period', col:ACCX, vals:currentValues.length ? currentValues : [0], w:2.6 }];
+      if (st.compare && priorValues.length) ovList.push({ name:'Previous period', col:'#bab6b6', vals:this.resample(priorValues, ovList[0].vals.length), dash:'5 6', w:2 });
+      if (!ovLabels.length) ovLabels = ['Unavailable'];
+      ovXAxis = 'Date';
+    } else {
+      const sSel = this.rangeSeries(cur, ovFn, ovRatio);
+      ovList = [{ name:'This period', col:ACCX, vals:sSel.vals, w:2.6 }];
+      ovLabels = labels;
+      ovXAxis = xT;
+    }
+    if (!useTrafficChart && selKpi === 'gross' && st.end === this.NOW && cur.ds.length >= 7 && dayOfMonth < dim) {
       const by = {}, ct = {}, tail = cur.ds.slice(-28);
       for (const d of tail) { const dw = new Date(d.t).getUTCDay(); by[dw] = (by[dw] || 0) + d.s; ct[dw] = (ct[dw] || 0) + 1; }
       const avgAll = tail.reduce((a, d) => a + d.s, 0) / Math.max(1, tail.length);
@@ -2084,7 +2245,7 @@ class Component extends DCLogic {
       }
       ovList.push({ name:'Forecast to month end', col:ACCL, vals:fvals, dash:'3 5', w:2 });
     }
-    const chartOv = this.mkChart(withPrev(ovList, ovFn, ovRatio), ovAx, ovTip, ovLabels, areaOn && ovAreaOk, 'ov', '', xT);
+    const chartOv = this.mkChart(useTrafficChart ? ovList : withPrev(ovList, ovFn, ovRatio), ovAx, ovTip, ovLabels, areaOn && ovAreaOk, 'ov', '', ovXAxis);
     let chList = CHE.filter(c => st.chartOn[c.k] ?? true).map(c => ({ name:c.n, col:c.c, vals:this.rangeSeries(cur, d => d.ch[c.k].s).vals, w:2.2 }));
     if (!chList.length) chList = [{ name:'No channels ticked', col:'#bab6b6', vals:zero }];
     const chartCh = this.mkChart(chList, km, m2, labels, false, 'ch', 'Sales (USD)', xT);
@@ -2097,6 +2258,67 @@ class Component extends DCLogic {
     const newV = cur.ds.length === 1 ? sOrd.vals.map(v => v * 0.6) : cur.ds.map(d => d.o * nf(d.t));
     const retV = sOrd.vals.map((v, i) => v - newV[i]);
     const chartCu = this.mkChart([{ name:'New customers', col:ACCX, vals:newV, w:2.4 }, { name:'Returning customers', col:ink, vals:retV, w:2.4 }], kn, n2, labels, false, 'cu', 'Orders', xT);
+
+    const gaEngagementRate = gaCur.sessions ? gaCur.engagedSessions / gaCur.sessions : 0;
+    const gaPrevEngagementRate = gaPrev.sessions ? gaPrev.engagedSessions / gaPrev.sessions : 0;
+    const trafficKpis = [
+      ['Sessions', gaCur.sessions, gaPrev.sessions, 'number'],
+      ['Engaged sessions', gaCur.engagedSessions, gaPrev.engagedSessions, 'number'],
+      ['Engagement rate', gaEngagementRate, gaPrevEngagementRate, 'percent'],
+      ['Added to cart', gaCur.addToCarts, gaPrev.addToCarts, 'number'],
+      ['Began checkout', gaCur.checkouts, gaPrev.checkouts, 'number'],
+      ['GA4 purchases', gaCur.ecommercePurchases, gaPrev.ecommercePurchases, 'number'],
+    ].map(([label, value, prior, type]) => ({
+      label,
+      val:trafficAvailable ? (type === 'percent' ? this.pct(value, 1) : this.num(value)) : '—',
+      ...(trafficAvailable ? this.delta(value, prior) : { delta:'Unavailable', dcol:'inherit' }),
+    }));
+    const trafficMetricDefs = {
+      sessions:{ label:'Sessions', field:d => d.sessions, ax:kn, tip:n2, area:true },
+      purchases:{ label:'Purchases', field:d => d.ecommercePurchases, ax:kn, tip:n2, area:true },
+      conversion:{ label:'Conversion rate', field:d => d.sessions ? d.ecommercePurchases / d.sessions : 0, ax:pf, tip:pf2, area:false },
+      revenue:{ label:'Tracked revenue', field:d => d.purchaseRevenue, ax:km, tip:m2, area:true },
+    };
+    const trafficMetric = trafficMetricDefs[st.trafficMetric] ? st.trafficMetric : 'sessions';
+    const trafficMetricDef = trafficMetricDefs[trafficMetric];
+    const trafficTrendValues = gaCur.ds.map(trafficMetricDef.field);
+    const trafficTrendList = [{ name:'This period', col:ACCX, vals:trafficTrendValues.length ? trafficTrendValues : [0], w:2.6 }];
+    if (st.compare && gaPrev.ds.length) trafficTrendList.push({ name:'Previous period', col:'#bab6b6', vals:this.resample(gaPrev.ds.map(trafficMetricDef.field), trafficTrendList[0].vals.length), dash:'5 6', w:2 });
+    const trafficTrendLabels = gaCur.ds.length ? gaCur.ds.map(d => this.fmtDate(d.t, false)) : ['Unavailable'];
+    const chartTraffic = this.mkChart(trafficTrendList, trafficMetricDef.ax, trafficMetricDef.tip, trafficTrendLabels, areaOn && trafficMetricDef.area, 'traffic', '', 'Date');
+    const funnelRaw = [
+      ['Sessions', gaCur.sessions],
+      ['Added to cart', gaCur.addToCarts],
+      ['Began checkout', gaCur.checkouts],
+      ['Purchased', gaCur.ecommercePurchases],
+    ];
+    const trafficFunnel = funnelRaw.map(([label, value], index) => ({
+      label,
+      value:trafficAvailable ? this.num(value) : '—',
+      width:trafficAvailable && gaCur.sessions ? Math.max(3, Math.min(100, value / gaCur.sessions * 100)).toFixed(1) + '%' : '0%',
+      stepRate:trafficAvailable && index ? (funnelRaw[index - 1][1] ? this.pct(value / funnelRaw[index - 1][1], 1) : '0.0%') : 'Entry',
+      overallRate:trafficAvailable && gaCur.sessions ? this.pct(value / gaCur.sessions, 1) : '—',
+    }));
+    const barRows = (rows, limit, valueField = 'sessions') => {
+      const top = rows.slice(0, limit), max = Math.max(1, ...top.map(r => Number(r[valueField]) || 0));
+      return top.map(r => ({ label:r.label, value:this.num(r[valueField] || 0), sub:r.sessions ? this.pct((r.engagedSessions || 0) / r.sessions, 1) + ' engaged' : 'No sessions', width:Math.max(1.5, (Number(r[valueField]) || 0) / max * 100).toFixed(1) + '%' }));
+    };
+    const trafficChannelRows = barRows(this.ga4Breakdown(trafficPayload?.channelGroups, st.start, st.end), 8);
+    const trafficSourceRows = barRows(this.ga4Breakdown(trafficPayload?.sourceMedium, st.start, st.end), 10);
+    const trafficCountryRows = barRows(this.ga4Breakdown(trafficPayload?.countries, st.start, st.end), 10);
+    const trafficDeviceRows = barRows(this.ga4Breakdown(trafficPayload?.devices, st.start, st.end), 6);
+    const trafficLandingRows = this.ga4Breakdown(trafficPayload?.landingPages, st.start, st.end).slice(0, 15).map((r, index) => ({ rank:index + 1, label:r.label, sessions:this.num(r.sessions), engagement:r.sessions ? this.pct(r.engagedSessions / r.sessions, 1) : '0.0%', purchases:this.num(r.ecommercePurchases), revenue:this.money2(r.purchaseRevenue) }));
+    const trafficMetricOptions = Object.entries(trafficMetricDefs).map(([key, def]) => ({ label:def.label, seg:this.mkSeg(trafficMetric === key), click:() => this.setState({ trafficMetric:key, hi:null }) }));
+    const trafficStatusLabel = trafficAvailable
+      ? (trafficStale ? 'Stale GA4 data' : 'GA4 synchronized') + ' · updated ' + trafficUpdated + (trafficProvisional ? ' · current day provisional' : '')
+      : trafficStateTitle;
+    const trafficStatusColor = trafficAvailable && !trafficStale ? 'var(--color-accent-700)' : 'var(--color-accent-2-700)';
+    const trafficReconciliation = [
+      { label:'GA4 ecommerce purchases', value:trafficAvailable ? this.num(gaCur.ecommercePurchases) : '—', note:'Diagnostic website event count' },
+      { label:'Shopify web orders', value:this.num(shopifyWebOrders), note:'Authoritative · D2C + B2B only' },
+      { label:'GA4 tracked revenue', value:trafficAvailable ? this.money2(gaCur.purchaseRevenue) : '—', note:'Diagnostic, not financial reporting' },
+      { label:'Shopify web total sales', value:this.money2((cur.ch.d2c?.ts || 0) + (cur.ch.b2b?.ts || 0)), note:'Authoritative commerce source' },
+    ];
 
     const totChange = cur.s - prev.s;
     const contrib = (c, p) => {
@@ -2635,7 +2857,11 @@ class Component extends DCLogic {
       dateBtnLabel:pr ? pr[1] : rangeLabel,
       continuous:st.continuous, segSec:this.mkSeg(!st.continuous), segCont:this.mkSeg(st.continuous),
       setBySection:() => this.setState({ continuous:false }), setContinuous:() => this.setState({ continuous:true }),
-      ovChartTitle:ovTitle, chartOvL:[chartOv], chartChL:[chartCh], chartRgL:[chartRg], chartOrdL:[chartOrd], chartCuL:[chartCu],
+      ovChartTitle:ovTitle, chartOvL:[chartOv], chartTrafficL:[chartTraffic], chartChL:[chartCh], chartRgL:[chartRg], chartOrdL:[chartOrd], chartCuL:[chartCu],
+      trafficAvailable, trafficUnavailable:!trafficAvailable, trafficStateTitle, trafficStateText, trafficStatusLabel, trafficStatusColor,
+      trafficKpis, trafficFunnel, trafficMetricOptions, trafficTrendTitle:trafficMetricDef.label,
+      trafficChannelRows, trafficSourceRows, trafficCountryRows, trafficDeviceRows, trafficLandingRows, trafficReconciliation,
+      trafficEngagement:{ sessions:this.num(gaCur.sessions), engaged:this.num(gaCur.engagedSessions), rate:this.pct(gaEngagementRate, 1), events:this.num(gaCur.eventCount), eventsPerSession:gaCur.sessions ? (gaCur.eventCount / gaCur.sessions).toFixed(2) : '0.00' },
       paceL:(this.props.showPace ?? true) ? [pace] : [],
       ctrlZ:(st.pickerOpen || st.cmpOpen) ? 60 : 34,
       pickCalOn:true,
@@ -2742,11 +2968,11 @@ class Component extends DCLogic {
       showUrl:false, dataUrl:st.dataUrl,
       urlPlaceholder:'/api/dashboard',
       setDataUrl:(e) => this.setState({ dataUrl:e.target.value }),
-      srcNote:'The browser never receives Shopify or Supabase credentials. Google Sheets remains an audit output, not a runtime dependency.',
+      srcNote:'The browser never receives Shopify, GA4, or Supabase credentials. Shopify is authoritative for commerce; GA4 supplies aggregate website analytics only.',
       growthVal:String(growth), setGrowth:(e) => this.setState({ growthO:Math.max(0, +e.target.value || 0) }),
       coverVal:String(coverDays), setCover:(e) => this.setState({ coverO:Math.max(1, Math.round(+e.target.value || 1)) }),
       retVal:String(+(retCeil * 100).toFixed(1)), setRet:(e) => this.setState({ retO:Math.max(0.5, +e.target.value || 0.5) }),
-      isOverview:st.continuous || st.view === 'overview', isChannels:st.continuous || st.view === 'channels', isRegions:st.continuous || st.view === 'regions',
+      isOverview:st.continuous || st.view === 'overview', isTraffic:st.continuous || st.view === 'traffic', isChannels:st.continuous || st.view === 'channels', isRegions:st.continuous || st.view === 'regions',
       isOrders:st.continuous || st.view === 'orders', isProducts:st.continuous || st.view === 'products', isCustomers:st.continuous || st.view === 'customers',
       isAds:st.continuous || st.view === 'ads', adUnavailable:st.dataStatus === 'live', adDataAvailable:st.dataStatus !== 'live', adKpis, chartAdsL:[chartAds], adPlatRows, adCampCols, adCampRows,
       ordCols, ordTagQ, ordTagInput:e => this.setState({ ordTagQ:e.target.value }), ordTagReset:() => this.setState({ ordTagQ:'' }), productStatus:st.productStatus, setProductStatus:e => this.setState({ productStatus:e.target.value, prodSort:null, expandedProduct:null, prodColumnsOpen:false, mobileProductLimit:20 }), prodCols,

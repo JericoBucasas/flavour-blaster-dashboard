@@ -173,3 +173,32 @@ test('customer reclassification trigger guards table-specific record fields', ()
   assert.match(source, /revoke all on function public\.fb_reclassify_shopify_customer_orders/);
   assert.match(source, /grant execute on function public\.fb_reclassify_shopify_customer_orders/);
 });
+
+test('GA4 storage is aggregate-only, browser-restricted, and exposed through its own reporting RPC', () => {
+  const source = fs.readFileSync('supabase/migrations/202609010001_ga4_traffic_reporting.sql', 'utf8');
+  assert.match(source, /create table if not exists public\.fb_ga4_daily/);
+  assert.match(source, /create table if not exists public\.fb_ga4_dimensions/);
+  assert.doesNotMatch(source, /client_id|visitor_id|email_address|raw_event/);
+  assert.match(source, /alter table public\.fb_ga4_daily enable row level security/);
+  assert.match(source, /revoke all on table public\.fb_ga4_daily from public, anon, authenticated/);
+  assert.match(source, /grant select, insert, update, delete on table public\.fb_ga4_daily to service_role/);
+  assert.match(source, /security invoker/);
+  assert.match(source, /create or replace function public\.fb_ga4_dashboard_snapshot/);
+  assert.match(source, /interval '12 hours'/);
+  assert.match(source, /grant execute on function public\.fb_ga4_dashboard_snapshot\(date, date\) to service_role/);
+});
+
+test('dashboard renders GA4 Overview KPIs and a filter-aware Traffic page without treating GA4 as commerce authority', () => {
+  const source = fs.readFileSync('Sales Dashboard v2.dc.html', 'utf8');
+  assert.match(source, /\['overview','traffic','channels'/);
+  assert.match(source, /Website sessions · GA4/);
+  assert.match(source, /GA4 purchase conversion/);
+  assert.match(source, /Shopify web order conversion/);
+  assert.match(source, /Website analytics are not applicable to Amazon-only channels\./);
+  assert.match(source, /canShowShopifyWebConv = trafficAvailable && !!st\.chOn\.d2c && !!st\.chOn\.b2b/);
+  assert.match(source, /GA4 is diagnostic\. Shopify remains authoritative for commerce\./);
+  assert.match(source, /<section id="sec-traffic"/);
+  assert.match(source, /<option value="traffic">Traffic<\/option>/);
+  assert.match(source, /const migratedOrder = .*k === 'conv' \? 'ga4conv'/);
+  assert.doesNotMatch(source, /GA4 sample|sample GA4|fallback GA4/i);
+});
