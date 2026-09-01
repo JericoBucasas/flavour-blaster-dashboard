@@ -42,6 +42,8 @@ test('GA4 workflows use the verified property, regional grains, bounded windows,
     for (const normalizer of normalizers) {
       assert.match(normalizer.parameters.jsCode, /region_code:regionCode/);
       assert.match(normalizer.parameters.jsCode, /regionCode \+ ':' \+ rawKey/);
+      assert.match(normalizer.parameters.jsCode, /const grouped = new Map\(\)/);
+      assert.match(normalizer.parameters.jsCode, /previous\[field\] \+= current\[field\]/);
     }
     const writes = workflow.nodes.filter((node) => node.name.startsWith('Supabase Upsert GA4') && !node.name.includes('Success Checkpoint'));
     assert.equal(writes.length, 6);
@@ -206,5 +208,6 @@ test('health workflow queries only columns present in the approved sync-state sc
   assert.doesNotMatch(read.parameters.url, /workflow_key|last_attempt_at|last_error/);
   const evaluate = workflow.nodes.find((node) => node.name === 'Evaluate Source Freshness');
   assert.match(evaluate.parameters.jsCode, /ga4_traffic/);
-  assert.match(evaluate.parameters.jsCode, /ga4_traffic', maxAgeMs: 12 \* 60 \* 60 \* 1000/);
+  assert.match(evaluate.parameters.jsCode, /const hour = 60 \* 60 \* 1000/);
+  assert.match(evaluate.parameters.jsCode, /ga4_traffic', maxAgeMs: 12 \* hour/);
 });
