@@ -1663,19 +1663,23 @@ class Component extends DCLogic {
       this.setState({ dataStatus:'error', dataError:error && error.message ? error.message : 'LIVE_DATA_UNAVAILABLE' });
     }
   }
-  componentDidUpdate(prevState) {
+  componentDidUpdate() {
     const st = this.state;
-    const rangeChanged = prevState.start !== st.start || prevState.end !== st.end || prevState.cmpMode !== st.cmpMode || prevState.cmpS !== st.cmpS || prevState.cmpE !== st.cmpE;
+    // The dashboard host passes previous props here, not previous logic state.
+    // Compare the requested bounds with the range already being served instead
+    // so section-only navigation can reuse the existing live payload.
+    const bounds = this.liveBounds(st);
+    const boundsPrefix = bounds.start + '|' + bounds.end + '|';
+    const rangeChanged = !String(st.dataRequestKey || '').startsWith(boundsPrefix);
     if (rangeChanged) {
       clearTimeout(this._liveRangeTimer);
       this._liveRangeTimer = setTimeout(() => this.loadLiveData(), 120);
     }
-    const viewChanged = prevState.view !== st.view || prevState.continuous !== st.continuous;
-    const liveRequestFinished = prevState.dataStatus === 'loading' && st.dataStatus === 'live';
+    const needsTraffic = (st.view === 'overview' || st.view === 'traffic') && !st.livePayload?.traffic;
     const needsProducts = st.view === 'products' && !st.livePayload?.productCatalog;
     const needsCustomers = st.view === 'customers' && !st.livePayload?.customerDirectory;
-    const needsAll = st.continuous && (!st.livePayload?.productCatalog || !st.livePayload?.customerDirectory);
-    if (!rangeChanged && st.dataStatus !== 'loading' && (viewChanged || liveRequestFinished) && (needsProducts || needsCustomers || needsAll)) {
+    const needsAll = st.continuous && (!st.livePayload?.traffic || !st.livePayload?.productCatalog || !st.livePayload?.customerDirectory);
+    if (!rangeChanged && st.dataStatus !== 'loading' && (needsTraffic || needsProducts || needsCustomers || needsAll)) {
       this.loadLiveData();
       return;
     }
