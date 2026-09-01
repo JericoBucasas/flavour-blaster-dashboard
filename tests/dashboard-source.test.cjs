@@ -9,8 +9,8 @@ test('dashboard loads only the selected and comparison ranges without reload loo
   assert.equal((source.match(/\bcomponentDidUpdate\s*\(/g) || []).length, 1);
   assert.match(source, /componentDidUpdate\(prevState\)/);
   assert.doesNotMatch(source, /componentDidUpdate\([^)]*,/);
-  assert.match(source, /\['overview','products','customers'\]/);
-  assert.doesNotMatch(source, /\? 'all' : this\.state\.view/);
+  assert.match(source, /this\.state\.continuous \? \['all'\] : \[this\.state\.view\]/);
+  assert.doesNotMatch(source, /\['overview','products','customers'\]/);
   assert.match(source, /alignToLatest/);
   assert.match(source, /rangeKey:coverageEndMs === this\.NOW - this\.D \? 'yesterday' : 'custom'/);
   assert.match(source, /liveBounds\(st = this\.state\)/);
@@ -191,6 +191,8 @@ test('GA4 storage is aggregate-only, browser-restricted, and exposed through its
 test('dashboard renders GA4 Overview KPIs and a filter-aware Traffic page without treating GA4 as commerce authority', () => {
   const source = fs.readFileSync('Sales Dashboard v2.dc.html', 'utf8');
   assert.match(source, /\['overview','traffic','channels'/);
+  assert.match(source, /const sections = this\.state\.continuous \? \['all'\] : \[this\.state\.view\]/);
+  assert.doesNotMatch(source, /this\.state\.continuous \? \['overview','products','customers'\]/);
   assert.match(source, /Website sessions · GA4/);
   assert.match(source, /GA4 purchase conversion/);
   assert.match(source, /Shopify web order conversion/);

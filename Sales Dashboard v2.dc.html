@@ -1617,7 +1617,10 @@ class Component extends DCLogic {
       return;
     }
     const bounds = this.liveBounds();
-    const sections = this.state.continuous ? ['overview','products','customers'] : [this.state.view];
+    // The all-sections response keeps GA4, catalog, and directory data in one
+    // coherent payload. Loading those sections separately lets a later
+    // current-month supplement overwrite the selected range's GA4 rows.
+    const sections = this.state.continuous ? ['all'] : [this.state.view];
     const requestKey = bounds.start + '|' + bounds.end + '|' + sections.join(',');
     if (this.state.dataRequestKey === requestKey && this.state.dataStatus !== 'error' && this.state.dataStatus !== 'empty') return;
     this.setState({ dataStatus:'loading', dataError:null, dataRequestKey:requestKey });
