@@ -2035,7 +2035,12 @@ class Component extends DCLogic {
     const X = i => n > 1 ? i / (n - 1) * W : W / 2;
     const Y = v => T + (H - T - B) * (1 - (v - mn) / (mx - mn));
     const series = list.map(s => ({ d:this.smooth(s.vals.map((v, i) => v == null ? null : [X(i), Y(v)]).filter(Boolean)), col:s.col, w:s.w || 2.4, dash:s.dash || 'none' }));
-    const areaP = area && list[0] ? this.smooth(list[0].vals.map((v, i) => [X(i), Y(v)])) + 'L' + W + ',' + (H - B) + 'L0,' + (H - B) + 'Z' : null;
+    const areaPoints = area && list[0]
+      ? list[0].vals.map((v, i) => v == null || !isFinite(v) ? null : [X(i), Y(v)]).filter(Boolean)
+      : [];
+    const areaP = areaPoints.length
+      ? this.smooth(areaPoints) + 'L' + W + ',' + (H - B) + 'L0,' + (H - B) + 'Z'
+      : null;
     // pick a formatter precise enough that adjacent gridline labels stay distinct
     const gStep = (mx - mn) * 0.25;
     let fmtG = fmtAx;

@@ -153,6 +153,7 @@ test('Finance navigation and dashboard surface follow the approved hierarchy', (
   assert.match(source, /financeEquation/);
   assert.match(source, /Cumulative Gross profit/);
   assert.match(source, /zeroY:Y\(0\)\.toFixed\(1\)/);
+  assert.match(source, /const areaP = areaPoints\.length/);
   assert.match(source, /'Relative day', true/);
   assert.match(source, /Shopify return fees are excluded/);
   assert.match(source, /bottomNav:navItems\.filter\(n => \['Overview','Orders','Products'\]\.includes\(n\.label\)\)/);
