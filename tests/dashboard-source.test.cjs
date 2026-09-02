@@ -142,6 +142,45 @@ test('Shopify AOV uses the original order state including immediate finalization
   assert.match(source, /grant execute on function public\.fb_dashboard_snapshot_v7\(date, date\) to service_role/);
 });
 
+test('Finance navigation and dashboard surface follow the approved hierarchy', () => {
+  const source = fs.readFileSync('Sales Dashboard v2.dc.html', 'utf8');
+  assert.match(source, /\['overview','Overview','ph-gauge'\],\['finance','Finance','ph-coins'\]/);
+  assert.match(source, /const VK = \['overview','finance','traffic'/);
+  assert.match(source, /const V = \['overview','finance','traffic'/);
+  assert.match(source, /<option value="overview">Overview<\/option><option value="finance">Finance<\/option>/);
+  assert.match(source, /<section id="sec-finance"/);
+  assert.match(source, /class="sd-card finance-summary-link"[^>]+onClick="\{\{ goFinance \}\}"/);
+  assert.match(source, /financeEquation/);
+  assert.match(source, /Cumulative Gross profit/);
+  assert.match(source, /zeroY:Y\(0\)\.toFixed\(1\)/);
+  assert.match(source, /'Relative day', true/);
+  assert.match(source, /Shopify return fees are excluded/);
+  assert.match(source, /bottomNav:navItems\.filter\(n => \['Overview','Orders','Products'\]\.includes\(n\.label\)\)/);
+  assert.match(source, /menuNav:navItems\.filter\(n => !\['Overview','Orders','Products'\]\.includes\(n\.label\)\)/);
+});
+
+test('Finance COGS coverage is exact and incomplete metrics remain blocked', () => {
+  const source = fs.readFileSync('Sales Dashboard v2.dc.html', 'utf8');
+  const live = fs.readFileSync('dashboard-live.js', 'utf8');
+  assert.doesNotMatch(source, /cogs:src\.cogs \* f/);
+  assert.match(source, /costedU','uncostedU','covRows','covKnown/);
+  assert.match(source, /Incomplete cost coverage/);
+  assert.match(source, /selectedReady:false, comparisonReady:false, lowerIsBetter:true, note:'Payment processor not connected/);
+  assert.match(live, /costed_units/);
+  assert.match(live, /uncosted_units/);
+  assert.match(live, /contributionComplete:false/);
+});
+
+test('Finance snapshot adds strict net-unit cost coverage without applying it', () => {
+  const source = fs.readFileSync('supabase/migrations/202609020001_finance_cost_coverage.sql', 'utf8');
+  assert.match(source, /create or replace function public\.fb_dashboard_snapshot_v8/);
+  assert.match(source, /greatest\(l\.quantity - l\.refunded_quantity, 0\)/);
+  assert.match(source, /l\.cogs is not null or l\.unit_cost is not null or canonical\.unit_cost is not null/);
+  assert.match(source, /costed_units/);
+  assert.match(source, /uncosted_units/);
+  assert.match(source, /grant execute on function public\.fb_dashboard_snapshot_v8\(date, date\) to service_role/);
+});
+
 test('Shopify B2B classification uses purchasing company, company membership, and qualifying tags', () => {
   const source = fs.readFileSync('supabase/migrations/202608240007_shopify_b2b_classification.sql', 'utf8');
   assert.match(source, /purchasingcompany/);
@@ -193,7 +232,7 @@ test('GA4 storage is aggregate-only, browser-restricted, and exposed through its
 
 test('dashboard renders GA4 Overview KPIs and a filter-aware Traffic page without treating GA4 as commerce authority', () => {
   const source = fs.readFileSync('Sales Dashboard v2.dc.html', 'utf8');
-  assert.match(source, /\['overview','traffic','channels'/);
+  assert.match(source, /\['overview','finance','traffic','channels'/);
   assert.match(source, /const sections = this\.state\.continuous \? \['all'\] : \[this\.state\.view\]/);
   assert.doesNotMatch(source, /this\.state\.continuous \? \['overview','products','customers'\]/);
   assert.match(source, /Website sessions · GA4/);

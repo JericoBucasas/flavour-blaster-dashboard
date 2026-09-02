@@ -14,7 +14,58 @@
   }
 
   function emptyCell() {
-    return { o:0, s:0, aovS:0, aovO:0, u:0, v:0, dsc:0, rfS:0, rfU:0, sh:0, tax:0, fee:0, cogs:0, ot:0 };
+    return { o:0, s:0, aovS:0, aovO:0, u:0, v:0, dsc:0, rfS:0, rfU:0, sh:0, tax:0, fee:0, cogs:0, ot:0, costedU:0, uncostedU:0, covRows:0, covKnown:0 };
+  }
+
+  function addCell(target, source) {
+    Object.keys(emptyCell()).forEach(function (key) { target[key] += number(source[key]); });
+  }
+
+  function financeStatus(aggregate) {
+    var rowCount = number(aggregate && aggregate.covRows);
+    var knownRows = number(aggregate && aggregate.covKnown);
+    var costedUnits = number(aggregate && aggregate.costedU);
+    var uncostedUnits = number(aggregate && aggregate.uncostedU);
+    var coverageKnown = rowCount > 0 && knownRows === rowCount;
+    var cogsComplete = coverageKnown && uncostedUnits === 0;
+    var cogsReason = cogsComplete ? '' : !coverageKnown
+      ? 'Cost coverage metadata unavailable'
+      : 'Incomplete cost coverage';
+    return {
+      coverageKnown:coverageKnown,
+      cogsComplete:cogsComplete,
+      cogsReason:cogsReason,
+      costedUnits:costedUnits,
+      uncostedUnits:uncostedUnits,
+      grossProfitComplete:cogsComplete,
+      adSpendComplete:false,
+      fulfilmentComplete:false,
+      paymentFeesComplete:false,
+      contributionComplete:false,
+    };
+  }
+
+  function cumulative(days, field) {
+    var total = 0;
+    return (Array.isArray(days) ? days : []).map(function (day) {
+      total += number(day && day[field]);
+      return total;
+    });
+  }
+
+  function financeChange(current, previous, lowerIsBetter) {
+    current = number(current);
+    previous = number(previous);
+    var difference = current - previous;
+    var direction = difference === 0 ? 0 : difference > 0 ? 1 : -1;
+    var favorable = direction === 0 ? null : lowerIsBetter ? direction < 0 : direction > 0;
+    return {
+      difference:difference,
+      direction:direction,
+      favorable:favorable,
+      percent:previous === 0 ? null : difference / Math.abs(previous),
+      zeroBaseline:previous === 0,
+    };
   }
 
   function normalize(payload, channels, regions) {
@@ -25,13 +76,13 @@
     var byDay = new Map();
     function dayRecord(day) {
       if (byDay.has(day)) return byDay.get(day);
-      var rec = { t:dateMs(day), ch:{}, reg:{}, cr:{}, hcr:{}, o:0, s:0, aovS:0, aovO:0, u:0, v:0, dsc:0, rfS:0, rfU:0, sh:0, tax:0, fee:0, cogs:0, ot:0, hw:new Array(24).fill(0) };
+      var rec = Object.assign({ t:dateMs(day), ch:{}, reg:{}, cr:{}, hcr:{}, hw:new Array(24).fill(0) }, emptyCell());
       channels.forEach(function (channel) {
         rec.ch[channel.k] = emptyCell();
-        rec.cr[channel.k] = regions.map(function () { return { o:0, s:0, aovS:0, aovO:0, dsc:0 }; });
+        rec.cr[channel.k] = regions.map(function () { return emptyCell(); });
         rec.hcr[channel.k] = regions.map(function () { return new Array(24).fill(0); });
       });
-      regions.forEach(function (region) { rec.reg[region.k] = { o:0, s:0, aovS:0, aovO:0, dsc:0 }; });
+      regions.forEach(function (region) { rec.reg[region.k] = emptyCell(); });
       byDay.set(day, rec);
       return rec;
     }
@@ -43,6 +94,7 @@
       var regionIndex = regions.findIndex(function (item) { return item.k === regionKey; });
       if (channelIndex < 0 || regionIndex < 0) return;
       var rec = dayRecord(row.day);
+      var coverageKnown = Object.prototype.hasOwnProperty.call(row, 'costed_units') && Object.prototype.hasOwnProperty.call(row, 'uncosted_units');
       var grossSales = number(row.gross_sales);
       var discounts = number(row.discounts);
       var sourceNetSales = Number(row.net_sales);
@@ -59,18 +111,13 @@
         dsc:discounts, rfS:salesReversals, rfU:0,
         sh:number(row.shipping), tax:number(row.taxes), fee:number(row.return_fees),
         cogs:number(row.cogs), ot:number(row.fulfilled_on_time),
+        costedU:number(row.costed_units), uncostedU:number(row.uncosted_units),
+        covRows:1, covKnown:coverageKnown ? 1 : 0,
       };
-      Object.keys(cell).forEach(function (key) { rec.ch[channelKey][key] += cell[key]; rec[key] += cell[key]; });
-      rec.reg[regionKey].o += cell.o;
-      rec.reg[regionKey].s += cell.s;
-      rec.reg[regionKey].aovS += cell.aovS;
-      rec.reg[regionKey].aovO += cell.aovO;
-      rec.reg[regionKey].dsc += cell.dsc;
-      rec.cr[channelKey][regionIndex].o += cell.o;
-      rec.cr[channelKey][regionIndex].s += cell.s;
-      rec.cr[channelKey][regionIndex].aovS += cell.aovS;
-      rec.cr[channelKey][regionIndex].aovO += cell.aovO;
-      rec.cr[channelKey][regionIndex].dsc += cell.dsc;
+      addCell(rec.ch[channelKey], cell);
+      addCell(rec, cell);
+      addCell(rec.reg[regionKey], cell);
+      addCell(rec.cr[channelKey][regionIndex], cell);
     });
 
     hourly.forEach(function (row) {
@@ -231,5 +278,5 @@
     return mergePayloads(parts, start, end);
   }
 
-  root.FlavourBlasterLive = { load:load, loadRange:loadRange, mergePayloads:mergePayloads, normalize:normalize };
+  root.FlavourBlasterLive = { load:load, loadRange:loadRange, mergePayloads:mergePayloads, normalize:normalize, financeStatus:financeStatus, cumulative:cumulative, financeChange:financeChange };
 })(window);

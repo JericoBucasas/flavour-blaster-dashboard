@@ -95,6 +95,50 @@ test('explicit AOV sales remain separate from post-order gross sales adjustments
   assert.equal(result.days[0].cr.d2c[2].aovS, 150);
 });
 
+test('finance cost coverage distinguishes confirmed zero cost from missing cost', () => {
+  const live = runtime();
+  const complete = live.normalize({ daily:[{
+    day:'2026-08-20', channel:'shopify_d2c', region_code:'gb', orders:1,
+    gross_sales:25, net_sales:25, units:2, cogs:0, costed_units:2, uncosted_units:0,
+  }] }, channels, regions).days[0];
+  assert.equal(live.financeStatus(complete).cogsComplete, true);
+  assert.equal(live.financeStatus(complete).costedUnits, 2);
+
+  const incomplete = live.normalize({ daily:[{
+    day:'2026-08-20', channel:'shopify_d2c', region_code:'gb', orders:1,
+    gross_sales:25, net_sales:25, units:2, cogs:0, costed_units:1, uncosted_units:1,
+  }] }, channels, regions).days[0];
+  assert.equal(live.financeStatus(incomplete).cogsComplete, false);
+  assert.equal(live.financeStatus(incomplete).cogsReason, 'Incomplete cost coverage');
+  assert.equal(live.financeStatus(incomplete).uncostedUnits, 1);
+
+  const legacy = live.normalize({ daily:[{
+    day:'2026-08-20', channel:'shopify_d2c', region_code:'gb', gross_sales:25, units:2, cogs:0,
+  }] }, channels, regions).days[0];
+  assert.equal(live.financeStatus(legacy).coverageKnown, false);
+});
+
+test('daily cost values retain exact channel and region grain', () => {
+  const day = runtime().normalize({ daily:[
+    { day:'2026-08-20', channel:'shopify_d2c', region_code:'gb', gross_sales:100, net_sales:100, units:2, cogs:70, costed_units:2, uncosted_units:0 },
+    { day:'2026-08-20', channel:'shopify_d2c', region_code:'us', gross_sales:300, net_sales:300, units:3, cogs:30, costed_units:2, uncosted_units:1 },
+  ] }, channels, regions).days[0];
+  assert.equal(day.cr.d2c[2].cogs, 70);
+  assert.equal(day.cr.d2c[0].cogs, 30);
+  assert.equal(day.cr.d2c[2].uncostedU, 0);
+  assert.equal(day.cr.d2c[0].uncostedU, 1);
+  assert.equal(day.ch.d2c.cogs, 100);
+});
+
+test('finance changes honor business impact and zero comparison values', () => {
+  const live = runtime();
+  assert.equal(live.financeChange(80, 100, true).favorable, true);
+  assert.equal(live.financeChange(120, 100, true).favorable, false);
+  assert.equal(live.financeChange(20, 0, false).zeroBaseline, true);
+  assert.equal(live.financeChange(0, 0, false).direction, 0);
+  assert.deepEqual(Array.from(live.cumulative([{ gp:10 }, { gp:-3 }, { gp:7 }], 'gp')), [10, 7, 14]);
+});
+
 test('live loader scopes the request to the active dashboard section', async () => {
   let requestedUrl = '';
   const context = {

@@ -29,7 +29,7 @@ module.exports = async function dashboard(req, res) {
   if (start > end) return res.status(400).json({ status: 'error', code: 'INVALID_RANGE' });
 
   const section = String(req.query && req.query.section || 'overview').toLowerCase();
-  const validSections = new Set(['all', 'overview', 'traffic', 'channels', 'regions', 'orders', 'products', 'customers', 'ads', 'settings']);
+  const validSections = new Set(['all', 'overview', 'finance', 'traffic', 'channels', 'regions', 'orders', 'products', 'customers', 'ads', 'settings']);
   if (!validSections.has(section)) return res.status(400).json({ status: 'error', code: 'INVALID_SECTION' });
   const needsCatalog = section === 'all' || section === 'products';
   const needsDirectory = section === 'all' || section === 'customers';
