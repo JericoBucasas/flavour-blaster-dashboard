@@ -152,6 +152,13 @@ test('Finance navigation and dashboard surface follow the approved hierarchy', (
   assert.match(source, /class="sd-card finance-summary-link"[^>]+onClick="\{\{ goFinance \}\}"/);
   assert.match(source, /financeEquation/);
   assert.match(source, /Cumulative Gross profit/);
+  assert.match(source, /const financeHeadlineMetrics = \[/);
+  assert.match(source, /label:'Contribution margin'.*note:'Additional costs not connected'/);
+  assert.match(source, /label:'Gross margin'.*grossMarginReady/);
+  assert.match(source, /label:'Orders'.*this\.num\(cur\.o\)/);
+  assert.match(source, /label:'Blended ROAS', value:'—', note:'Ads accounts not connected'/);
+  assert.match(source, /\.finance-metric-grid \{ grid-template-columns:repeat\(2,minmax\(0,1fr\)\) !important; \}/);
+  assert.doesNotMatch(source, /const financeKeyMetrics = \[/);
   assert.match(source, /zeroY:Y\(0\)\.toFixed\(1\)/);
   assert.match(source, /const areaP = areaPoints\.length/);
   assert.match(source, /'Relative day', true/);

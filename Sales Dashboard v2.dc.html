@@ -74,13 +74,18 @@
     .finance-equation-step.is-contribution { background:var(--color-accent-100);color:var(--color-accent-800); }
     .finance-equation-value { margin-top:9px;font-size:19px;font-weight:700;font-variant-numeric:tabular-nums;overflow-wrap:anywhere; }
     .finance-equation-note { min-height:17px;margin-top:7px;font-size:11.5px;line-height:1.35;opacity:.66; }
+    .finance-metric-grid { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:16px; }
+    .finance-metric-grid > div { min-height:128px;padding:15px 17px 14px;box-sizing:border-box; }
+    .finance-metric-label { display:flex;align-items:flex-start;justify-content:space-between;gap:12px;font-size:12.5px;font-weight:600;line-height:1.35; }
+    .finance-metric-label i { flex:none;font-size:16px;opacity:.82; }
+    .finance-metric-value { margin-top:14px;font-size:29px;font-weight:720;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.025em; }
+    .finance-metric-support { display:flex;align-items:center;gap:7px;min-height:24px;margin-top:10px;font-size:11.5px;line-height:1.35; }
+    .finance-metric-delta { flex:none;padding:3px 7px;border-radius:999px;font-weight:700;font-variant-numeric:tabular-nums; }
+    .finance-metric-note { min-width:0;opacity:.58;overflow-wrap:anywhere; }
     .finance-upper { display:grid;grid-template-columns:minmax(250px,.72fr) minmax(0,1.75fr);gap:16px;margin-top:16px; }
-    .finance-lower { display:grid;grid-template-columns:minmax(0,1.8fr) minmax(240px,.62fr);gap:16px;margin-top:16px; }
+    .finance-lower { margin-top:16px; }
     .finance-summary-stat { padding:12px 0;border-top:1px solid var(--sd-line); }
     .finance-summary-stat:first-child { border-top:0;padding-top:2px; }
-    .finance-key-row { display:flex;align-items:center;gap:11px;padding:13px 0;border-top:1px solid var(--sd-line); }
-    .finance-key-row:first-child { border-top:0; }
-    .finance-key-icon { width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--color-accent-100);color:var(--color-accent-700);flex:none; }
     .finance-empty { min-height:220px;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;box-sizing:border-box; }
     .finance-breakdown td,.finance-breakdown th { font-variant-numeric:tabular-nums; }
     .finance-breakdown tr.is-total td { color:var(--color-accent-800);font-weight:700;background:var(--color-accent-100); }
@@ -184,6 +189,11 @@
       .sd-kpis > div > div:nth-child(3) { height:auto !important;min-height:28px !important;line-height:1.3;margin-top:4px !important; }
       #sec-overview > .sd-kpis { display:none !important; }
       .sd-kpis > div:nth-child(n+5) { display:var(--mobile-extra-display, none) !important; }
+      .finance-metric-grid { grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
+      .finance-metric-grid > div { min-height:118px !important;padding:13px 14px 12px !important; }
+      .finance-metric-grid > div > .finance-metric-label { min-height:34px; }
+      .finance-metric-grid > div > .finance-metric-value { margin-top:7px !important;font-size:24px !important; }
+      .finance-metric-grid > div > .finance-metric-support { min-height:32px !important;margin-top:7px !important;white-space:normal !important; }
       .mobile-metrics-toggle { appearance:none;display:flex !important;align-items:center;justify-content:center;gap:7px;width:100%;min-height:44px;margin-top:8px;border:1px solid var(--sd-line);border-radius:10px;background:transparent;color:inherit;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer; }
       .data-status-banner { padding:8px 10px !important;margin-bottom:2px !important; }
       .data-status-banner .m-only { min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
@@ -227,7 +237,8 @@
       .finance-equation-step { padding:11px 12px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;align-items:center; }
       .finance-equation-value { margin-top:0;font-size:17px;text-align:right; }
       .finance-equation-note { grid-column:1 / -1;min-height:0;margin-top:1px; }
-      .finance-upper,.finance-lower { grid-template-columns:minmax(0,1fr);gap:12px;margin-top:12px; }
+      .finance-upper,.finance-lower { margin-top:12px; }
+      .finance-upper { grid-template-columns:minmax(0,1fr);gap:12px; }
       .finance-empty { min-height:170px; }
     }
   </style>
@@ -759,6 +770,16 @@
           </div>
         </div>
 
+        <div class="sd-grid2 sd-kpis finance-metric-grid" role="list" aria-label="Finance headline metrics">
+          <sc-for list="{{ financeHeadlineMetrics }}" as="metric" hint-placeholder-count="4">
+            <div role="listitem">
+              <div class="finance-metric-label"><span>{{ metric.label }}</span><i class="ph-duotone {{ metric.icon }}" aria-hidden="true"></i></div>
+              <div class="finance-metric-value">{{ metric.value }}</div>
+              <div class="finance-metric-support"><sc-if value="{{ metric.hasChange }}" hint-placeholder-val="true"><span class="finance-metric-delta" style="color:{{ metric.changeColor }};background:{{ metric.changeBg }}">{{ metric.change }}</span></sc-if><span class="finance-metric-note">{{ metric.note }}</span></div>
+            </div>
+          </sc-for>
+        </div>
+
         <div class="finance-upper">
           <div class="sd-card" style="margin:0">
             <div class="sd-card-h">Summary</div>
@@ -780,7 +801,6 @@
 
         <div class="finance-lower">
           <div class="sd-card" style="margin:0;min-width:0"><div class="sd-card-h">Breakdown</div><div style="overflow-x:auto"><table class="table finance-breakdown" style="width:100%;min-width:{{ financeTableMinWidth }}"><thead><tr><th>Metric</th><th style="text-align:right">Selected period</th><sc-if value="{{ financeCompareOn }}" hint-placeholder-val="{{ true }}"><th style="text-align:right">Comparison period</th><th style="text-align:right">Change</th></sc-if><th style="text-align:right">% of net sales</th></tr></thead><tbody><sc-for list="{{ financeRows }}" as="row" hint-placeholder-count="7"><tr class="{{ row.cls }}"><td><div style="font-weight:{{ row.weight }}">{{ row.label }}</div><div style="font-size:11px;opacity:.58;margin-top:2px">{{ row.note }}</div></td><td style="text-align:right;color:{{ row.selectedColor }}">{{ row.selected }}</td><sc-if value="{{ financeCompareOn }}" hint-placeholder-val="{{ true }}"><td style="text-align:right;color:{{ row.comparisonColor }}">{{ row.comparison }}</td><td style="text-align:right;color:{{ row.changeColor }};font-weight:600">{{ row.change }}</td></sc-if><td style="text-align:right">{{ row.share }}</td></tr></sc-for></tbody></table></div></div>
-          <div class="sd-card" style="margin:0"><div class="sd-card-h">Key metrics</div><sc-for list="{{ financeKeyMetrics }}" as="metric" hint-placeholder-count="4"><div class="finance-key-row"><div class="finance-key-icon"><i class="ph-duotone {{ metric.icon }}" style="font-size:18px"></i></div><div style="min-width:0;flex:1"><div style="font-size:12px;opacity:.66">{{ metric.label }}</div><div style="font-size:15px;font-weight:680;margin-top:3px;font-variant-numeric:tabular-nums">{{ metric.value }}</div></div><div style="font-size:11.5px;font-weight:650;color:{{ metric.changeColor }};text-align:right">{{ metric.change }}</div></div></sc-for></div>
         </div>
       </section>
     </sc-if>
@@ -2520,15 +2540,21 @@ class Component extends DCLogic {
       financeRow('Contribution', 0, 0, { selectedReady:false, comparisonReady:false, note:'Requires complete COGS and all additional cost categories', cls:'is-total', weight:'700' }),
     ];
     const orderChange = financeChangeView(cur.o, prev.o, false, true);
-    const aovChange = financeChangeView(cAov, pAov, false, true);
     const marginChange = st.compare && liveCostAvailable && previousFinanceStatus.cogsComplete && cur.ns && prev.ns
       ? { text:((cMar - pMar) >= 0 ? '↑ ' : '↓ ') + Math.abs((cMar - pMar) * 100).toFixed(1) + 'pp', color:(cMar - pMar) >= 0 ? 'var(--color-accent-700)' : 'var(--color-accent-2-700)' }
       : { text:st.compare ? '—' : '', color:'inherit' };
-    const financeKeyMetrics = [
-      { label:'Orders', value:this.num(cur.o), change:orderChange.text, changeColor:orderChange.color, icon:'ph-shopping-cart' },
-      { label:'AOV', value:this.money2Aov(cAov), change:aovChange.text, changeColor:aovChange.color, icon:'ph-tag' },
-      { label:'Gross margin', value:liveCostAvailable && cur.ns ? this.pct(cMar, 1) : '—', change:marginChange.text, changeColor:marginChange.color, icon:'ph-percent' },
-      { label:'Contribution margin', value:'—', change:'Unavailable', changeColor:'inherit', icon:'ph-coins' },
+    const financeMetricDelta = change => ({
+      hasChange:!!change.text && change.text !== '—',
+      change:change.text === '—' ? '' : change.text,
+      changeColor:change.color,
+      changeBg:change.color === 'var(--color-accent-700)' ? 'var(--color-accent-100)' : change.color === 'var(--color-accent-2-700)' ? 'var(--color-accent-2-100)' : 'var(--color-neutral-200)',
+    });
+    const grossMarginReady = liveCostAvailable && cur.ns !== 0;
+    const financeHeadlineMetrics = [
+      { label:'Contribution margin', value:'—', note:'Additional costs not connected', icon:'ph-arrow-up-right', ...financeMetricDelta({ text:'', color:'inherit' }) },
+      { label:'Gross margin', value:grossMarginReady ? this.pct(cMar, 1) : '—', note:grossMarginReady ? (st.compare ? previousFinanceStatus.cogsComplete && prev.ns ? 'vs ' + this.pct(pMar, 1) : 'Comparison cost coverage incomplete' : rangeLabel) : (liveCostAvailable ? 'Net sales is zero' : financeCoverageIssue), icon:'ph-arrow-up-right', ...financeMetricDelta(marginChange) },
+      { label:'Orders', value:this.num(cur.o), note:st.compare ? 'vs ' + this.num(prev.o) : rangeLabel, icon:'ph-shopping-cart', ...financeMetricDelta(orderChange) },
+      { label:'Blended ROAS', value:'—', note:'Ads accounts not connected', icon:'ph-arrow-up-right', ...financeMetricDelta({ text:'', color:'inherit' }) },
     ];
     const financeChartAvailable = liveCostAvailable && cur.ds.length > 0;
     const financeChartUnavailable = !financeChartAvailable;
@@ -2962,7 +2988,7 @@ class Component extends DCLogic {
       navItems, flags:flags.map(f => ({ ...f, goBell:() => { this.setState({ bellOpen:false }); f.go(); } })), briefL, pnl, anomalyFeed, hasAnoms, amzRows, hasAmz, exportCsv,
       goFinance:() => { this.setState({ view:'finance', continuous:false, hi:null }); window.scrollTo(0, 0); },
       financeEquation, financeCoverageLabel, financeCoverageColor, financeHeadlineLabel, financeHeadlineValue, financeHeadlineColor, financeSummaryColor, financeSummaryNote, financeSummaryRows,
-      financeRows, financeKeyMetrics, financeCompareOn:st.compare, financeTableMinWidth:st.compare ? '760px' : '520px',
+      financeRows, financeHeadlineMetrics, financeCompareOn:st.compare, financeTableMinWidth:st.compare ? '760px' : '520px',
       financeChartAvailable, financeChartUnavailable, financeChartTitle, financeChartNote, financeChartEmptyText, financeChartL,
       dataStatusLabel:statusMap.label,
       dataStatusMobileLabel:st.dataStatus === 'loading' ? 'Connecting to Shopify…' : st.dataStatus === 'live' && reconciliationIssue ? 'Shopify reconciliation in progress' : st.dataStatus === 'live' && !stale ? 'Shopify data synced' : st.dataStatus === 'live' ? 'Shopify data needs refresh' : st.dataStatus === 'empty' ? 'No Shopify records in this period' : 'Shopify data unavailable',
