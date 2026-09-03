@@ -12,7 +12,7 @@ test('dashboard loads only the selected and comparison ranges without reload loo
   assert.match(source, /const boundsPrefix = bounds\.start \+ '\\|' \+ bounds\.end \+ '\\|'/);
   assert.match(source, /const rangeChanged = !String\(st\.dataRequestKey \|\| ''\)\.startsWith\(boundsPrefix\)/);
   assert.match(source, /const needsTraffic = \(st\.view === 'overview' \|\| st\.view === 'traffic'\) && !st\.livePayload\?\.traffic/);
-  assert.match(source, /st\.dataStatus !== 'loading' && \(needsTraffic \|\| needsProducts \|\| needsCustomers \|\| needsAll\)/);
+  assert.match(source, /st\.dataStatus !== 'loading' && \(needsTraffic \|\| needsAds \|\| needsProducts \|\| needsCustomers \|\| needsAll\)/);
   assert.match(source, /this\.state\.continuous \? \['all'\] : \[this\.state\.view\]/);
   assert.doesNotMatch(source, /\['overview','products','customers'\]/);
   assert.match(source, /alignToLatest/);
@@ -156,7 +156,8 @@ test('Finance navigation and dashboard surface follow the approved hierarchy', (
   assert.match(source, /label:'Contribution margin'.*note:'Additional costs not connected'/);
   assert.match(source, /label:'Gross margin'.*grossMarginReady/);
   assert.match(source, /label:'Orders'.*this\.num\(cur\.o\)/);
-  assert.match(source, /label:'Blended ROAS', value:'—', note:'Ads accounts not connected'/);
+  assert.match(source, /label:'Google Ads ROAS'.*Google-attributed revenue · Meta not connected/);
+  assert.match(source, /label:'Blended ROAS', value:'—', note:'Meta Ads not connected'/);
   assert.match(source, /\.finance-metric-grid \{ grid-template-columns:repeat\(2,minmax\(0,1fr\)\) !important; \}/);
   assert.doesNotMatch(source, /const financeKeyMetrics = \[/);
   assert.match(source, /zeroY:Y\(0\)\.toFixed\(1\)/);
@@ -236,6 +237,20 @@ test('GA4 storage is aggregate-only, browser-restricted, and exposed through its
   assert.match(source, /create or replace function public\.fb_ga4_dashboard_snapshot/);
   assert.match(source, /interval '12 hours'/);
   assert.match(source, /grant execute on function public\.fb_ga4_dashboard_snapshot\(date, date\) to service_role/);
+});
+
+test('Google Ads live UI is partial, region-aware, and never substitutes synthetic account data', () => {
+  const source = fs.readFileSync('Sales Dashboard v2.dc.html', 'utf8');
+  assert.match(source, /FlavourBlasterLive\.adsRange/);
+  assert.match(source, /Google Ads connected · Meta Ads not connected/);
+  assert.match(source, /Google-attributed revenue/);
+  assert.match(source, /channel filters do not allocate Google Ads spend/);
+  assert.match(source, /Google Ads spend · partial/);
+  assert.match(source, /No partial or estimated advertising figures are shown/);
+  assert.match(source, /Google Ads connected · data needs refresh/);
+  assert.match(source, /name:'Previous period'.*adsPrevious\.ds/s);
+  assert.doesNotMatch(source, /const adSpendTot = cur\.s \* 0\.108/);
+  assert.doesNotMatch(source, /Sample figures modelled from the period's sales/);
 });
 
 test('dashboard renders GA4 Overview KPIs and a filter-aware Traffic page without treating GA4 as commerce authority', () => {

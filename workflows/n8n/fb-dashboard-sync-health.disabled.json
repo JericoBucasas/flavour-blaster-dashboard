@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## READ-ONLY SYNC MONITOR\nInactive template with a closed code gate. It reads only the approved `fb_sync_state` columns. Shopify orders and sales events must have a successful checkpoint within two hours; the product catalog, customer/company directory, and Amazon order sources within eight hours; and GA4 traffic within 12 hours. No email, Sheet, Slack, Teams or other external output is connected.",
+        "content": "## READ-ONLY SYNC MONITOR\nInactive template with a closed code gate. It reads only the approved `fb_sync_state` columns. Shopify orders, sales events, and Google Ads must have a successful checkpoint within two hours; the product catalog, customer/company directory, and Amazon order sources within eight hours; and GA4 traffic within 12 hours. No email, Sheet, Slack, Teams or other external output is connected.",
         "height": 240,
         "width": 500,
         "color": 5
@@ -52,7 +52,7 @@
     },
     {
       "parameters": {
-        "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_sync_state?source_key=in.(shopify_orders,shopify_sales_events,shopify_products,shopify_customer_company_directory,amazon_us_orders,amazon_uk_orders,ga4_traffic)&select=source_key,cursor_updated_at,last_success_at,metadata,updated_at&order=source_key.asc",
+        "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/fb_sync_state?source_key=in.(shopify_orders,shopify_sales_events,shopify_products,shopify_customer_company_directory,amazon_us_orders,amazon_uk_orders,ga4_traffic,google_ads)&select=source_key,cursor_updated_at,last_success_at,metadata,updated_at&order=source_key.asc",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpCustomAuth",
         "sendHeaders": true,
@@ -93,7 +93,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const rows = $input.all().map(i => i.json);\nconst byKey = new Map(rows.filter(r => r?.source_key).map(r => [r.source_key, r]));\nconst now = Date.now();\nconst hour = 60 * 60 * 1000;\nconst required = [\n  { key: 'shopify_orders', maxAgeMs: 2 * hour },\n  { key: 'shopify_sales_events', maxAgeMs: 2 * hour },\n  { key: 'shopify_products', maxAgeMs: 8 * hour },\n  { key: 'shopify_customer_company_directory', maxAgeMs: 8 * hour },\n  { key: 'amazon_us_orders', maxAgeMs: 8 * hour },\n  { key: 'amazon_uk_orders', maxAgeMs: 8 * hour },\n  { key: 'ga4_traffic', maxAgeMs: 12 * hour },\n];\nconst stale = required.filter(({ key, maxAgeMs }) => {\n  const when = Date.parse(byKey.get(key)?.last_success_at || '');\n  return !Number.isFinite(when) || now - when > maxAgeMs;\n}).map(({ key }) => key);\nif (stale.length) throw new Error(`SYNC_HEALTH_STALE:${stale.join(',')}`);\nreturn [{ json: {\n  status: 'healthy',\n  checkedAt: new Date().toISOString(),\n  sources: required.map(({ key }) => ({\n    source_key: key,\n    last_success_at: byKey.get(key)?.last_success_at || null,\n  })),\n} }];"
+        "jsCode": "const rows = $input.all().map(i => i.json);\nconst byKey = new Map(rows.filter(r => r?.source_key).map(r => [r.source_key, r]));\nconst now = Date.now();\nconst hour = 60 * 60 * 1000;\nconst required = [\n  { key: 'shopify_orders', maxAgeMs: 2 * hour },\n  { key: 'shopify_sales_events', maxAgeMs: 2 * hour },\n  { key: 'google_ads', maxAgeMs: 2 * hour },\n  { key: 'shopify_products', maxAgeMs: 8 * hour },\n  { key: 'shopify_customer_company_directory', maxAgeMs: 8 * hour },\n  { key: 'amazon_us_orders', maxAgeMs: 8 * hour },\n  { key: 'amazon_uk_orders', maxAgeMs: 8 * hour },\n  { key: 'ga4_traffic', maxAgeMs: 12 * hour },\n];\nconst stale = required.filter(({ key, maxAgeMs }) => {\n  const when = Date.parse(byKey.get(key)?.last_success_at || '');\n  return !Number.isFinite(when) || now - when > maxAgeMs;\n}).map(({ key }) => key);\nif (stale.length) throw new Error(`SYNC_HEALTH_STALE:${stale.join(',')}`);\nreturn [{ json: {\n  status: 'healthy',\n  checkedAt: new Date().toISOString(),\n  sources: required.map(({ key }) => ({\n    source_key: key,\n    last_success_at: byKey.get(key)?.last_success_at || null,\n  })),\n} }];"
       },
       "id": "health-evaluate",
       "name": "Evaluate Source Freshness",

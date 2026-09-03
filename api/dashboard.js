@@ -6,9 +6,12 @@ const {
   buildCatalogRequest,
   buildDirectoryRequest,
   buildTrafficRequest,
+  buildAdsRequest,
   sanitizeSnapshot,
   sanitizeTraffic,
   unavailableTraffic,
+  sanitizeAds,
+  unavailableAds,
 } = require('../lib/dashboard-request');
 
 module.exports = async function dashboard(req, res) {
@@ -34,17 +37,20 @@ module.exports = async function dashboard(req, res) {
   const needsCatalog = section === 'all' || section === 'products';
   const needsDirectory = section === 'all' || section === 'customers';
   const needsTraffic = section === 'all' || section === 'overview' || section === 'traffic';
+  const needsAds = section === 'all' || section === 'overview' || section === 'finance' || section === 'ads';
 
   const secretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
   let request;
   let catalogRequest = null;
   let directoryRequest = null;
   let trafficRequest = null;
+  let adsRequest = null;
   try {
     request = buildSnapshotRequest(process.env.SUPABASE_URL, secretKey, start, end);
     if (needsCatalog) catalogRequest = buildCatalogRequest(process.env.SUPABASE_URL, secretKey);
     if (needsDirectory) directoryRequest = buildDirectoryRequest(process.env.SUPABASE_URL, secretKey, 500);
     if (needsTraffic) trafficRequest = buildTrafficRequest(process.env.SUPABASE_URL, secretKey, start, end);
+    if (needsAds) adsRequest = buildAdsRequest(process.env.SUPABASE_URL, secretKey, start, end);
   } catch (_error) {
     return res.status(503).json({ status: 'unavailable', code: 'DATASTORE_NOT_CONFIGURED' });
   }
@@ -54,19 +60,25 @@ module.exports = async function dashboard(req, res) {
     if (catalogRequest) upstreams.push({ name:'catalog', request:catalogRequest });
     if (directoryRequest) upstreams.push({ name:'directory', request:directoryRequest });
     if (trafficRequest) upstreams.push({ name:'traffic', request:trafficRequest });
-    const responses = await Promise.all(upstreams.map(({ request:upstream }) => fetch(upstream.url, upstream.options)));
-    const bodies = await Promise.all(responses.map((upstream) => upstream.json().catch(() => null)));
-    for (let index = 0; index < responses.length; index += 1) {
-      if (responses[index].ok || upstreams[index].name === 'traffic') continue;
+    if (adsRequest) upstreams.push({ name:'ads', request:adsRequest });
+    const results = await Promise.all(upstreams.map(async ({ name, request:upstream }) => {
+      try {
+        const response = await fetch(upstream.url, upstream.options);
+        return { name, response, body:await response.json().catch(() => null), error:null };
+      } catch (error) {
+        return { name, response:null, body:null, error };
+      }
+    }));
+    for (let index = 0; index < results.length; index += 1) {
+      const result = results[index];
+      if ((result.response && result.response.ok) || result.name === 'traffic' || result.name === 'ads') continue;
       console.error('[api/dashboard] Supabase RPC failed', {
-        source:upstreams[index].name,
-        status:responses[index].status,
+        source:result.name,
+        status:result.response ? result.response.status : 'network_error',
       });
       return res.status(502).json({ status:'error', code:'DATASTORE_QUERY_FAILED' });
     }
-    const responseByName = Object.fromEntries(upstreams.map((upstream, index) => [upstream.name, {
-      response:responses[index], body:bodies[index],
-    }]));
+    const responseByName = Object.fromEntries(results.map((result) => [result.name, result]));
     const data = sanitizeSnapshot(responseByName.snapshot.body);
     let productCatalog;
     if (needsCatalog) {
@@ -91,14 +103,27 @@ module.exports = async function dashboard(req, res) {
     if (boundedCustomerDirectory) responseData.customerDirectory = boundedCustomerDirectory;
     if (needsTraffic) {
       const trafficUpstream = responseByName.traffic;
-      if (!trafficUpstream.response.ok) {
-        console.error('[api/dashboard] GA4 Supabase RPC unavailable', { status:trafficUpstream.response.status });
+      if (!trafficUpstream.response || !trafficUpstream.response.ok) {
+        console.error('[api/dashboard] GA4 Supabase RPC unavailable', { status:trafficUpstream.response ? trafficUpstream.response.status : 'network_error' });
         responseData.traffic = unavailableTraffic('GA4_DATASTORE_QUERY_FAILED');
       } else {
         try {
           responseData.traffic = sanitizeTraffic(trafficUpstream.body);
         } catch (_error) {
           responseData.traffic = unavailableTraffic('GA4_PAYLOAD_INVALID');
+        }
+      }
+    }
+    if (needsAds) {
+      const adsUpstream = responseByName.ads;
+      if (!adsUpstream.response || !adsUpstream.response.ok) {
+        console.error('[api/dashboard] Google Ads Supabase RPC unavailable', { status:adsUpstream.response ? adsUpstream.response.status : 'network_error' });
+        responseData.ads = unavailableAds('GOOGLE_ADS_DATASTORE_QUERY_FAILED');
+      } else {
+        try {
+          responseData.ads = sanitizeAds(adsUpstream.body);
+        } catch (_error) {
+          responseData.ads = unavailableAds('GOOGLE_ADS_PAYLOAD_INVALID');
         }
       }
     }

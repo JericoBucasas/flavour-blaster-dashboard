@@ -1,0 +1,140 @@
+{
+  "name": "FB Dashboard | Google Ads Ingest [DISABLED]",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## GOOGLE ADS REPORTING INGEST\nDisabled source-controlled template. Accept only the aggregate payload from the read-only Google Ads Script installed in customer **932-938-7049**. Configure Header Auth for `X-FB-Ads-Sync-Key`, connect the existing Supabase service-role credential, validate one completed-day sample twice, and obtain approval before opening the gate or activating the webhook. No live webhook URL or secret belongs in source control.",
+        "height": 260,
+        "width": 560,
+        "color": 5
+      },
+      "id": "google-ads-note",
+      "name": "Read Before Testing",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-660, -240]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "fb-dashboard-google-ads-ingest",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "google-ads-webhook",
+      "name": "Google Ads Aggregate Webhook [CREDENTIAL REQUIRED]",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-620, 120],
+      "webhookId": "FB_GOOGLE_ADS_WEBHOOK_REQUIRED",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "FB_GOOGLE_ADS_HEADER_REQUIRED",
+          "name": "Flavour Blaster Google Ads Sync Header [REQUIRED]"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const DEVELOPMENT_GATE = false;\nif (!DEVELOPMENT_GATE) throw new Error('DEVELOPMENT_GATE_CLOSED: approve the Google Ads ingest before changing this value');\nreturn $input.all();"
+      },
+      "id": "google-ads-gate",
+      "name": "Closed Development Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-360, 120]
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $json.body ?? $json;\nconst fail = code => { throw new Error('GOOGLE_ADS_PAYLOAD_INVALID:' + code); };\nconst isoDay = value => {\n  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(value || '')) return false;\n  const parsed = Date.parse(value + 'T00:00:00Z');\n  return Number.isFinite(parsed) && new Date(parsed).toISOString().slice(0, 10) === value;\n};\nif (!payload || typeof payload !== 'object' || Array.isArray(payload)) fail('OBJECT_REQUIRED');\nif (payload.schemaVersion !== 1 || payload.source !== 'google_ads') fail('SCHEMA');\nif (payload.customerId !== '9329387049') fail('CUSTOMER');\nif (payload.currencyCode !== 'GBP' || payload.timeZone !== 'Europe/London') fail('ACCOUNT_SETTINGS');\nif (!['incremental','correction','backfill'].includes(payload.mode)) fail('MODE');\nif (!payload.window || !isoDay(payload.window.start) || !isoDay(payload.window.end)) fail('WINDOW');\nconst start = Date.parse(payload.window.start + 'T00:00:00Z');\nconst end = Date.parse(payload.window.end + 'T00:00:00Z');\nif (start > end || payload.window.start < '2025-01-01' || (end - start) / 86400000 > 34) fail('WINDOW_BOUNDS');\nif (!/^\\d{4}-\\d{2}-\\d{2}T/.test(payload.generatedAt || '') || !Number.isFinite(Date.parse(payload.generatedAt)) || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(payload.requestId || '')) fail('REQUEST_METADATA');\nif (!Array.isArray(payload.campaignDaily) || !Array.isArray(payload.campaignCountryDaily)) fail('ROWS');\nif (payload.campaignDaily.length > 200000 || payload.campaignCountryDaily.length > 500000) fail('ROW_LIMIT');\nconst finite = value => typeof value === 'number' && Number.isFinite(value) && value >= 0;\nconst micros = value => typeof value === 'string' && /^[0-9]+$/.test(value);\nconst campaignIds = new Set();\nfor (const row of payload.campaignDaily) {\n  if (!row || !isoDay(row.day) || row.day < payload.window.start || row.day > payload.window.end || !/^[0-9]+$/.test(row.campaignId || '') || typeof row.campaignName !== 'string' || row.campaignName.length > 1024 || !row.campaignStatus || !row.channelType || !row.channelSubtype || !micros(row.costMicros) || !finite(row.impressions) || !finite(row.clicks) || !finite(row.conversions) || !finite(row.conversionValue)) fail('CAMPAIGN_ROW');\n  campaignIds.add(row.day + ':' + row.campaignId);\n}\nfor (const row of payload.campaignCountryDaily) {\n  if (!row || !isoDay(row.day) || row.day < payload.window.start || row.day > payload.window.end || !/^[0-9]+$/.test(row.campaignId || '') || !campaignIds.has(row.day + ':' + row.campaignId) || !/^[0-9]+$/.test(row.countryCriterionId || '') || (row.countryCode && !/^[A-Z]{2}$/.test(row.countryCode)) || !['us','gb','eur','aus','other'].includes(row.regionCode) || typeof row.targetingLocation !== 'boolean' || !micros(row.costMicros) || !finite(row.impressions) || !finite(row.clicks) || !finite(row.conversions) || !finite(row.conversionValue)) fail('COUNTRY_ROW');\n}\nreturn [{ json:payload }];"
+      },
+      "id": "google-ads-validate",
+      "name": "Validate Complete Google Ads Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-100, 120]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/rpc/fb_google_ads_replace_window",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Accept", "value": "application/json" },
+            { "name": "User-Agent", "value": "FlavourBlasterDashboard-n8n/1.0" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ p_payload:$json }) }}",
+        "options": { "timeout": 120000 }
+      },
+      "id": "google-ads-write",
+      "name": "Supabase Upsert Google Ads Window [CREDENTIAL REQUIRED]",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [180, 120],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "FB_SUPABASE_CUSTOM_REQUIRED",
+          "name": "Flavour Blaster Supabase Service Role [REQUIRED]"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": { "responseCode": 200 }
+      },
+      "id": "google-ads-response",
+      "name": "Return Accepted Window",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [460, 120]
+    }
+  ],
+  "connections": {
+    "Google Ads Aggregate Webhook [CREDENTIAL REQUIRED]": {
+      "main": [[{ "node": "Closed Development Gate", "type": "main", "index": 0 }]]
+    },
+    "Closed Development Gate": {
+      "main": [[{ "node": "Validate Complete Google Ads Payload", "type": "main", "index": 0 }]]
+    },
+    "Validate Complete Google Ads Payload": {
+      "main": [[{ "node": "Supabase Upsert Google Ads Window [CREDENTIAL REQUIRED]", "type": "main", "index": 0 }]]
+    },
+    "Supabase Upsert Google Ads Window [CREDENTIAL REQUIRED]": {
+      "main": [[{ "node": "Return Accepted Window", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none",
+    "saveExecutionProgress": false,
+    "saveManualExecutions": false,
+    "callerPolicy": "workflowsFromSameOwner",
+    "timezone": "Europe/London"
+  },
+  "versionId": "fb-dashboard-google-ads-ingest-development-v1",
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "customerId": "9329387049",
+    "currencyCode": "GBP",
+    "historicalFloor": "2025-01-01",
+    "maxWindowDays": 35,
+    "source": "google_ads"
+  },
+  "tags": []
+}

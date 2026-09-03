@@ -166,3 +166,94 @@ test('long-range merge deduplicates GA4 daily and regional dimension rows', () =
   assert.equal(merged.traffic.channelGroups.length, 1);
   assert.equal(merged.traffic.channelGroups[0].sessions, 9);
 });
+
+test('Google Ads totals use authoritative account rows and reconciled region rows', () => {
+  const live = runtime();
+  const payload = {
+    status:'live', rangeComplete:true, geoComplete:true,
+    dailyTotals:[
+      { day:'2026-08-19', cost:10, impressions:1000, clicks:50, conversions:2, conversionValue:40 },
+      { day:'2026-08-20', cost:20, impressions:2000, clicks:80, conversions:3, conversionValue:90, isProvisional:true },
+    ],
+    dailyRegions:[
+      { day:'2026-08-19', regionCode:'gb', cost:6, impressions:600, clicks:30, conversions:1, conversionValue:25 },
+      { day:'2026-08-19', regionCode:'us', cost:4, impressions:400, clicks:20, conversions:1, conversionValue:15 },
+      { day:'2026-08-20', regionCode:'gb', cost:12, impressions:1200, clicks:45, conversions:2, conversionValue:60, isProvisional:true },
+      { day:'2026-08-20', regionCode:'us', cost:8, impressions:800, clicks:35, conversions:1, conversionValue:30, isProvisional:true },
+    ],
+    campaigns:[
+      { day:'2026-08-19', campaignId:'1', campaignName:'Search', campaignStatus:'ENABLED', channelType:'SEARCH', channelSubtype:'SEARCH_STANDARD', cost:10, impressions:1000, clicks:50, conversions:2, conversionValue:40 },
+      { day:'2026-08-20', campaignId:'1', campaignName:'Search', campaignStatus:'ENABLED', channelType:'SEARCH', channelSubtype:'SEARCH_STANDARD', cost:20, impressions:2000, clicks:80, conversions:3, conversionValue:90 },
+    ],
+    campaignRegions:[
+      { day:'2026-08-19', campaignId:'1', regionCode:'gb', cost:6, impressions:600, clicks:30, conversions:1, conversionValue:25 },
+      { day:'2026-08-19', campaignId:'1', regionCode:'us', cost:4, impressions:400, clicks:20, conversions:1, conversionValue:15 },
+      { day:'2026-08-20', campaignId:'1', regionCode:'gb', cost:12, impressions:1200, clicks:45, conversions:2, conversionValue:60 },
+      { day:'2026-08-20', campaignId:'1', regionCode:'us', cost:8, impressions:800, clicks:35, conversions:1, conversionValue:30 },
+    ],
+  };
+  const all = live.adsRange(payload, Date.parse('2026-08-19T00:00:00Z'), Date.parse('2026-08-20T00:00:00Z'), ['us','gb','eur','aus','other']);
+  assert.equal(all.available, true);
+  assert.equal(all.cost, 30);
+  assert.equal(all.conversionValue, 130);
+  assert.equal(all.roas, 130 / 30);
+  assert.equal(all.provisional, true);
+  assert.equal(all.campaigns[0].campaignName, 'Search');
+
+  const gb = live.adsRange(payload, Date.parse('2026-08-19T00:00:00Z'), Date.parse('2026-08-20T00:00:00Z'), ['gb']);
+  assert.equal(gb.available, true);
+  assert.equal(gb.cost, 18);
+  assert.equal(gb.campaigns[0].cost, 18);
+  assert.equal(gb.campaigns[0].conversionValue, 85);
+});
+
+test('Google Ads region mismatch and incomplete coverage stay unavailable', () => {
+  const live = runtime();
+  const base = { status:'live', rangeComplete:true, geoComplete:false, geographyReason:'Mismatch', dailyTotals:[], dailyRegions:[], campaigns:[], campaignRegions:[] };
+  const regional = live.adsRange(base, 0, Date.now(), ['gb']);
+  assert.equal(regional.available, false);
+  assert.equal(regional.reason, 'Mismatch');
+  const incomplete = live.adsRange({ ...base, rangeComplete:false, geoComplete:true }, 0, Date.now(), ['us','gb','eur','aus','other']);
+  assert.equal(incomplete.available, false);
+  assert.match(incomplete.reason, /coverage is incomplete/);
+});
+
+test('Google Ads zero denominators stay null without hiding a covered zero-activity range', () => {
+  const live = runtime();
+  const zero = live.adsRange({
+    status:'live', rangeComplete:true, geoComplete:true,
+    dailyTotals:[{ day:'2026-08-20', cost:0, impressions:0, clicks:0, conversions:0, conversionValue:0 }],
+    dailyRegions:[], campaigns:[{ day:'2026-08-20', campaignId:'1', campaignName:'No activity', cost:0, impressions:0, clicks:0, conversions:0, conversionValue:0 }], campaignRegions:[],
+  }, Date.parse('2026-08-20T00:00:00Z'), Date.parse('2026-08-20T00:00:00Z'), ['us','gb','eur','aus','other']);
+  assert.equal(zero.available, true);
+  assert.equal(zero.roas, null);
+  assert.equal(zero.cpa, null);
+  assert.equal(zero.ctr, null);
+  assert.equal(zero.cpc, null);
+  assert.equal(zero.campaigns.length, 0);
+});
+
+test('Google Ads is a partial Finance input and never completes contribution', () => {
+  const live = runtime();
+  const status = live.financeStatus({ covRows:1, covKnown:1, costedU:2, uncostedU:0 }, { available:true, cost:42.5 });
+  assert.equal(status.cogsComplete, true);
+  assert.equal(status.googleAdsComplete, true);
+  assert.equal(status.googleAdsPartial, true);
+  assert.equal(status.googleAdsSpend, 42.5);
+  assert.equal(status.adSpendComplete, false);
+  assert.equal(status.contributionComplete, false);
+});
+
+test('long-range merge combines Google Ads chunks without losing strict status', () => {
+  const merged = runtime().mergePayloads([
+    { ads:{ customerId:'9329387049', currencyCode:'GBP', timeZone:'Europe/London', status:'live', rangeComplete:true, backfillComplete:true, geoComplete:true, dailyTotals:[{ day:'2025-12-31', cost:10, impressions:100, clicks:10, conversions:1, conversionValue:30 }], dailyRegions:[], campaigns:[{ day:'2025-12-31', campaignId:'1', campaignName:'Search', cost:10, impressions:100, clicks:10, conversions:1, conversionValue:30 }], campaignRegions:[] } },
+    { ads:{ customerId:'9329387049', currencyCode:'GBP', timeZone:'Europe/London', status:'stale', rangeComplete:true, backfillComplete:false, geoComplete:true, dailyTotals:[{ day:'2026-01-01', cost:20, impressions:200, clicks:20, conversions:2, conversionValue:50 }], dailyRegions:[], campaigns:[{ day:'2026-01-01', campaignId:'1', campaignName:'Search', cost:20, impressions:200, clicks:20, conversions:2, conversionValue:50 }], campaignRegions:[] } },
+  ], '2025-12-31', '2026-01-01');
+  assert.equal(merged.ads.status, 'stale');
+  assert.equal(merged.ads.backfillComplete, false);
+  assert.equal(merged.ads.dailyTotals.length, 2);
+  assert.equal(merged.ads.campaigns.length, 2);
+  const range = runtime().adsRange(merged.ads, Date.parse('2025-12-31T00:00:00Z'), Date.parse('2026-01-01T00:00:00Z'), ['us','gb','eur','aus','other']);
+  assert.equal(range.campaigns[0].cost, 30);
+  assert.equal(range.campaigns[0].conversionValue, 80);
+});

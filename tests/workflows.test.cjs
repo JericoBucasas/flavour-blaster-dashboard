@@ -9,7 +9,7 @@ const workflowDir = path.join(__dirname, '..', 'workflows', 'n8n');
 const files = fs.readdirSync(workflowDir).filter((name) => name.endsWith('.json'));
 
 test('all committed n8n workflows are disabled behind a closed gate', () => {
-  assert.equal(files.length, 6);
+  assert.equal(files.length, 7);
   for (const file of files) {
     const workflow = JSON.parse(fs.readFileSync(path.join(workflowDir, file), 'utf8'));
     assert.equal(workflow.active, false, file);
@@ -208,6 +208,30 @@ test('health workflow queries only columns present in the approved sync-state sc
   assert.doesNotMatch(read.parameters.url, /workflow_key|last_attempt_at|last_error/);
   const evaluate = workflow.nodes.find((node) => node.name === 'Evaluate Source Freshness');
   assert.match(evaluate.parameters.jsCode, /ga4_traffic/);
+  assert.match(evaluate.parameters.jsCode, /google_ads/);
   assert.match(evaluate.parameters.jsCode, /const hour = 60 \* 60 \* 1000/);
   assert.match(evaluate.parameters.jsCode, /ga4_traffic', maxAgeMs: 12 \* hour/);
+  assert.match(evaluate.parameters.jsCode, /google_ads', maxAgeMs: 2 \* hour/);
+});
+
+test('Google Ads ingest is disabled, authenticated, bounded, and checkpointed only by its transactional RPC', () => {
+  const workflow = JSON.parse(fs.readFileSync(path.join(workflowDir, 'fb-dashboard-google-ads-ingest.disabled.json'), 'utf8'));
+  assert.equal(workflow.active, false);
+  assert.equal(workflow.settings.timezone, 'Europe/London');
+  assert.equal(workflow.meta.customerId, '9329387049');
+  assert.equal(workflow.meta.historicalFloor, '2025-01-01');
+  assert.equal(workflow.meta.maxWindowDays, 35);
+  const webhook = workflow.nodes.find((node) => node.name.startsWith('Google Ads Aggregate Webhook'));
+  assert.equal(webhook.parameters.authentication, 'headerAuth');
+  assert.equal(webhook.credentials.httpHeaderAuth.id, 'FB_GOOGLE_ADS_HEADER_REQUIRED');
+  const validation = workflow.nodes.find((node) => node.name === 'Validate Complete Google Ads Payload').parameters.jsCode;
+  assert.match(validation, /payload\.customerId !== '9329387049'/);
+  assert.match(validation, /payload\.window\.start < '2025-01-01'/);
+  assert.match(validation, /> 34/);
+  assert.match(validation, /campaignIds\.has/);
+  const write = workflow.nodes.find((node) => node.name === 'Supabase Upsert Google Ads Window [CREDENTIAL REQUIRED]');
+  assert.match(write.parameters.url, /fb_google_ads_replace_window$/);
+  assert.equal(write.credentials.httpCustomAuth.id, 'FB_SUPABASE_CUSTOM_REQUIRED');
+  assert.equal(write.retryOnFail, true);
+  assert.equal(workflow.nodes.some((node) => node.type === 'n8n-nodes-base.scheduleTrigger'), false);
 });

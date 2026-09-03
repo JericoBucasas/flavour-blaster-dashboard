@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parseDate, buildSnapshotRequest, buildCatalogRequest, buildDirectoryRequest, buildTrafficRequest, sanitizeSnapshot, sanitizeTraffic, unavailableTraffic } = require('../lib/dashboard-request');
+const { parseDate, buildSnapshotRequest, buildCatalogRequest, buildDirectoryRequest, buildTrafficRequest, buildAdsRequest, sanitizeSnapshot, sanitizeTraffic, unavailableTraffic, sanitizeAds, unavailableAds } = require('../lib/dashboard-request');
 
 test('parseDate accepts ISO dates and falls back safely', () => {
   assert.equal(parseDate('2026-08-20', '2025-01-01'), '2026-08-20');
@@ -53,6 +53,30 @@ test('traffic response enforces the aggregate-only dashboard contract', () => {
   assert.equal(data.status, 'stale');
   assert.equal(data.daily[0].sessions, 12);
   assert.equal(unavailableTraffic().status, 'unavailable');
+});
+
+test('Google Ads request stays server-side and targets its reporting RPC', () => {
+  const request = buildAdsRequest('https://hnmmlfelaezmijbbwzsg.supabase.co/', '[test-secret]', '2026-08-01', '2026-08-20');
+  assert.equal(request.url, 'https://hnmmlfelaezmijbbwzsg.supabase.co/rest/v1/rpc/fb_google_ads_dashboard_snapshot');
+  assert.equal(request.options.headers.apikey, '[test-secret]');
+  assert.equal(request.options.headers.Authorization, undefined);
+  assert.deepEqual(JSON.parse(request.options.body), { p_start:'2026-08-01', p_end:'2026-08-20' });
+});
+
+test('Google Ads response enforces account metadata and bounded aggregate rows', () => {
+  const data = sanitizeAds({
+    customerId:'9329387049', currencyCode:'GBP', timeZone:'Europe/London', status:'live',
+    rangeComplete:true, backfillComplete:false, geoComplete:true,
+    dailyTotals:[{ day:'2026-08-20', cost:12.34, impressions:1000, clicks:40, conversions:2.5, conversionValue:80, isProvisional:true }],
+    dailyRegions:[], campaigns:[], campaignRegions:[],
+  });
+  assert.equal(data.customerId, '9329387049');
+  assert.equal(data.dailyTotals[0].cost, 12.34);
+  assert.equal(data.dailyTotals[0].isProvisional, true);
+  assert.equal(unavailableAds().status, 'unavailable');
+  assert.throws(() => sanitizeAds({ customerId:'another-account', currencyCode:'GBP', timeZone:'Europe/London', dailyTotals:[], dailyRegions:[], campaigns:[], campaignRegions:[] }));
+  assert.throws(() => sanitizeAds({ customerId:'9329387049', currencyCode:'GBP', timeZone:'Europe/London', status:'live', dailyTotals:[{ day:'not-a-date', cost:0, impressions:0, clicks:0, conversions:0, conversionValue:0 }], dailyRegions:[], campaigns:[], campaignRegions:[] }));
+  assert.throws(() => sanitizeAds({ customerId:'9329387049', currencyCode:'GBP', timeZone:'Europe/London', status:'live', dailyTotals:[], dailyRegions:[{ day:'2026-09-01', regionCode:'moon', cost:0, impressions:0, clicks:0, conversions:0, conversionValue:0 }], campaigns:[], campaignRegions:[] }));
 });
 
 test('snapshot response keeps complete order references and display names', () => {
